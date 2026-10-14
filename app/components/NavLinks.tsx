@@ -15,6 +15,7 @@ export function NavLinks({ live, demo }: { live: string[]; demo: boolean }) {
     <>
       <nav className="tabs" aria-label="Main">
         <Link href="/" className="tab" aria-current={p === "/" ? "page" : undefined}>{t("nav.engagements")}</Link>
+        <Link href="/track-record" className="tab" aria-current={p === "/track-record" ? "page" : undefined}>{lang === "ar" ? "سجلّ الأداء" : "Track record"}</Link>
       </nav>
       <div className="bar-tools">
         {live.length > 0

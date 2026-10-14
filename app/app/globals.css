@@ -372,3 +372,13 @@ details[open] summary{margin-block-end:6px}
 details.more { margin-block-end: 12px; }
 details.more summary { cursor: pointer; color: var(--gold, #A9822F); font-weight: 600; font-size: 14px; }
 details.more p { margin-block-start: 8px; }
+
+.privacy { border-inline-start: 3px solid var(--gold, #A9822F); }
+pre.ai-saw { white-space: pre-wrap; word-break: break-word; font-size: 12.5px; line-height: 1.55; background: var(--paper2, #F6F4EF); padding: 12px; border-radius: 4px; max-height: 340px; overflow: auto; }
+
+.tr-list { display: grid; gap: 10px; margin-block-start: 12px; }
+.tr-row { display: grid; grid-template-columns: 92px 1fr; gap: 12px; align-items: start; padding: 12px; border: 1px solid var(--line, #E3DFD6); border-inline-start-width: 3px; border-radius: 4px; }
+.tr-row.ok { border-inline-start-color: #2E7D4F; } .tr-row.part { border-inline-start-color: #D08A2E; } .tr-row.bad { border-inline-start-color: #B4302A; }
+.tr-row p { margin: 4px 0 0; }
+@media (max-width: 600px) { .tr-row { grid-template-columns: 1fr; } }
+pre.ai-saw mark, .data-t mark { background: #F3E7C9; color: #6B4E12; padding: 0 2px; border-radius: 2px; }

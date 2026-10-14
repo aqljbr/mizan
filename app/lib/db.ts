@@ -106,6 +106,15 @@ CREATE TABLE IF NOT EXISTS jobs (
   error TEXT
 );
 -- Every AI call, in full, so any answer can be traced to exactly what the model saw and said.
+-- The privacy shield's placeholders: which identifier each [KIND_n] stands for. Never sent to the AI.
+CREATE TABLE IF NOT EXISTS shield_tokens (
+  engagement_id TEXT NOT NULL,
+  token TEXT NOT NULL,
+  value TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  PRIMARY KEY (engagement_id, token)
+);
+
 CREATE TABLE IF NOT EXISTS llm_calls (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   engagement_id TEXT,
@@ -199,7 +208,7 @@ export function db(): Database.Database {
   const n = conn.prepare("SELECT COUNT(*) AS n FROM engagements").get() as { n: number };
   // Columns added after the first release (CREATE TABLE IF NOT EXISTS doesn't add them to old files).
   for (const [t, c, def] of [["data_items", "research", "TEXT"], ["data_items", "research_at", "TEXT"], ["data_items", "holder", "TEXT"],
-    ["data_items", "origin", "TEXT NOT NULL DEFAULT 'requested'"], ["engagements", "client_role", "TEXT"], ["engagements", "as_of", "TEXT"], ["reports", "objection_reply", "TEXT"], ["reports", "headline", "TEXT"], ["reports", "points_json", "TEXT"]]) {
+    ["data_items", "origin", "TEXT NOT NULL DEFAULT 'requested'"], ["engagements", "client_role", "TEXT"], ["engagements", "as_of", "TEXT"], ["reports", "objection_reply", "TEXT"], ["reports", "headline", "TEXT"], ["reports", "points_json", "TEXT"], ["llm_calls", "masked", "INTEGER"]]) {
     try { conn.exec(`ALTER TABLE ${t} ADD COLUMN ${c} ${def}`); } catch { /* already there */ }
   }
   if (n.n === 0) seed(conn);

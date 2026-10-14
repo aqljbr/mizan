@@ -7,6 +7,7 @@ import { WorldSection } from "@/components/WorldSection";
 import { BriefingSection } from "@/components/BriefingSection";
 import { ScrollTop } from "@/components/ScrollTop";
 import { ScanCard } from "@/components/ScanCard";
+import { PrivacyCard } from "@/components/PrivacyCard";
 import { ExhibitChart, type ExhibitData } from "@/components/ExhibitChart";
 import { listExhibits, headlineNumbers } from "@/lib/analyst/analyst";
 import { history } from "@/lib/engine/agents";
@@ -261,6 +262,7 @@ export default async function CaseFilePage({ params }: { params: Promise<{ id: s
 
 </>,
             data: <>
+          <PrivacyCard engagementId={e.id} lang={lang} />
           <BriefingSection id={e.id} items={briefingItems(c).map((b) => ({ id: b.id, name: b.name, read_summary: b.read_summary }))} canRerun={final && !running} />
 
           <section className="sheet" aria-labelledby="data">

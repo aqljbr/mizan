@@ -378,6 +378,7 @@ Then PRE-REGISTER, BEFORE any results exist: decide-now tests that can be checke
 
   // ---- DIAGNOSE / REVISE (one round) ----
   let revised = false;
+  let recheckSkipped = false;
   if (disputed.length || !check.preregistration_passed || red.would_change_decision || trace.length || check.ignored_option) {
     setStep(jobId, "revise");
     const feedback = [
@@ -393,8 +394,16 @@ Then PRE-REGISTER, BEFORE any results exist: decide-now tests that can be checke
     revised = true;
     appendEvent(conn, engagementId, "consultant", "finding.revised", { decision_before: before.decision_type, decision_after: draft.decision_type, findings: draft.findings.length });
     setStep(jobId, "recheck");
-    [check, red] = await attack(engagementId, jobId, factsOnly(), world, draft, trace, 2, c.e.lang);
-    saveArtifact(engagementId, jobId, "check", "round2", { draft, trace, check, red });
+    try {
+      [check, red] = await attack(engagementId, jobId, factsOnly(), world, draft, trace, 2, c.e.lang);
+      saveArtifact(engagementId, jobId, "check", "round2", { draft, trace, check, red });
+    } catch (e) {
+      // The revised answer is already written; a network failure here must not throw it away.
+      // Keep it, say plainly that the second check did not run, and don't apply round-1 verdicts to findings they never saw.
+      recheckSkipped = true;
+      appendEvent(conn, engagementId, "checker", "check.skipped", { round: 2, reason: String((e as Error).message).slice(0, 200) });
+      check = { ...check, findings: [], overall_note: `${check.overall_note} (Second check could not run: ${String((e as Error).message).slice(0, 80)}.)` };
+    }
   }
 
   // ---- DECIDE: apply the checker's verdict in code. Disputes left after revision are downgraded, not hidden. ----
@@ -403,6 +412,7 @@ Then PRE-REGISTER, BEFORE any results exist: decide-now tests that can be checke
   const finalFindings = draft.findings.map((f, i) => {
     const v = verdict.get(i);
     if (v?.verdict === "disputes") return { ...f, confidence: lower(f.confidence, v.confidence_should_be), checker: "revised" as const, checker_note: `Checker disputed: ${v.note} Confidence lowered.` };
+    if (recheckSkipped) return { ...f, checker: "revised" as const, checker_note: "Revised after the checker's first round; the second check could not run (connection problem), so treat this finding as unconfirmed." };
     return { ...f, checker: (revised ? "revised" : "agrees") as "revised" | "agrees", checker_note: v?.note ?? "Checker agrees." };
   });
   let decisionType: Verdict = draft.decision_type;

@@ -12,3 +12,4 @@ app/next-env.d.ts
 engagements/002-colorland-web-sales/
 engagements/003-google-new-campaign/
 engagements/004-mvp-ux-design/holdout/ANSWER_KEY.md
+!.env.example
