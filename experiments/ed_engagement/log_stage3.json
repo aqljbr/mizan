@@ -1,0 +1,273 @@
+{
+ "log": [
+  {
+   "stage": "NEGOTIATE",
+   "action": "Entity agents: hospital <-> care home, block contract for step-down (21-day) slots",
+   "offer_rounds": [
+    [
+     170,
+     240
+    ],
+    [
+     198.0,
+     219.0
+    ],
+    [
+     206.4,
+     212.7
+    ]
+   ],
+   "agreed": "12 slots @ $210/day = $0.92M/yr",
+   "constraint_engine": {
+    "price >= care-home cost +8%": true,
+    "price <= hospital max": true,
+    "slots 12 <= vacant 14 - 2 buffer": true
+   },
+   "rejected": "hospital also asked for 60 slots -> REJECTED: only 14 vacant beds"
+  }
+ ],
+ "results": {
+  "S0 baseline": {
+   "cost_M": 0.0,
+   "base": {
+    "pct4h": 85.1,
+    "waits12h_wk": 29.6,
+    "cancel_wk": 24.3,
+    "pct4h_p5": 77.9
+   },
+   "demand +8%": {
+    "pct4h": 59.2,
+    "waits12h_wk": 225.6,
+    "cancel_wk": 51.9,
+    "pct4h_p5": 34.4
+   },
+   "LOS +10%": {
+    "pct4h": 70.6,
+    "waits12h_wk": 111.1,
+    "cancel_wk": 48.9,
+    "pct4h_p5": 56.7
+   }
+  },
+  "S1 +10 ED cubicles (client idea)": {
+   "cost_M": 2.5,
+   "base": {
+    "pct4h": 88.8,
+    "waits12h_wk": 24.3,
+    "cancel_wk": 24.3,
+    "pct4h_p5": 86.1
+   },
+   "demand +8%": {
+    "pct4h": 75.9,
+    "waits12h_wk": 107.1,
+    "cancel_wk": 49.3,
+    "pct4h_p5": 56.6
+   },
+   "LOS +10%": {
+    "pct4h": 78.2,
+    "waits12h_wk": 92.1,
+    "cancel_wk": 46.5,
+    "pct4h_p5": 48.9
+   }
+  },
+  "S2 +20 ward beds": {
+   "cost_M": 5.0,
+   "base": {
+    "pct4h": 90.3,
+    "waits12h_wk": 9.5,
+    "cancel_wk": 11.5,
+    "pct4h_p5": 85.3
+   },
+   "demand +8%": {
+    "pct4h": 80.4,
+    "waits12h_wk": 46.8,
+    "cancel_wk": 29.1,
+    "pct4h_p5": 74.0
+   },
+   "LOS +10%": {
+    "pct4h": 84.9,
+    "waits12h_wk": 32.8,
+    "cancel_wk": 26.4,
+    "pct4h_p5": 79.2
+   }
+  },
+  "S3a ward round 11:00 -> 09:00": {
+   "cost_M": 0.1,
+   "base": {
+    "pct4h": 87.3,
+    "waits12h_wk": 29.5,
+    "cancel_wk": 27.9,
+    "pct4h_p5": 83.6
+   },
+   "demand +8%": {
+    "pct4h": 63.2,
+    "waits12h_wk": 245.3,
+    "cancel_wk": 55.9,
+    "pct4h_p5": 33.1
+   },
+   "LOS +10%": {
+    "pct4h": 72.3,
+    "waits12h_wk": 154.3,
+    "cancel_wk": 52.1,
+    "pct4h_p5": 35.3
+   }
+  },
+  "S3b TTO prepared at round": {
+   "cost_M": 0.35,
+   "base": {
+    "pct4h": 86.6,
+    "waits12h_wk": 34.2,
+    "cancel_wk": 26.4,
+    "pct4h_p5": 80.7
+   },
+   "demand +8%": {
+    "pct4h": 72.1,
+    "waits12h_wk": 123.5,
+    "cancel_wk": 47.7,
+    "pct4h_p5": 59.4
+   },
+   "LOS +10%": {
+    "pct4h": 73.2,
+    "waits12h_wk": 130.4,
+    "cancel_wk": 47.3,
+    "pct4h_p5": 56.9
+   }
+  },
+  "S3c weekend discharge cover": {
+   "cost_M": 0.6,
+   "base": {
+    "pct4h": 92.1,
+    "waits12h_wk": 2.3,
+    "cancel_wk": 14.3,
+    "pct4h_p5": 90.6
+   },
+   "demand +8%": {
+    "pct4h": 88.0,
+    "waits12h_wk": 17.6,
+    "cancel_wk": 36.5,
+    "pct4h_p5": 76.9
+   },
+   "LOS +10%": {
+    "pct4h": 89.6,
+    "waits12h_wk": 11.5,
+    "cancel_wk": 34.4,
+    "pct4h_p5": 83.5
+   }
+  },
+  "S3 discharge redesign (a+b+c)": {
+   "cost_M": 1.05,
+   "base": {
+    "pct4h": 92.6,
+    "waits12h_wk": 2.1,
+    "cancel_wk": 18.2,
+    "pct4h_p5": 91.7
+   },
+   "demand +8%": {
+    "pct4h": 90.9,
+    "waits12h_wk": 11.9,
+    "cancel_wk": 39.1,
+    "pct4h_p5": 86.3
+   },
+   "LOS +10%": {
+    "pct4h": 91.3,
+    "waits12h_wk": 9.1,
+    "cancel_wk": 41.2,
+    "pct4h_p5": 89.9
+   }
+  },
+  "S4 care-home block contract": {
+   "cost_M": 0.92,
+   "base": {
+    "pct4h": 86.3,
+    "waits12h_wk": 24.1,
+    "cancel_wk": 24.4,
+    "pct4h_p5": 80.7
+   },
+   "demand +8%": {
+    "pct4h": 61.6,
+    "waits12h_wk": 205.8,
+    "cancel_wk": 49.1,
+    "pct4h_p5": 41.7
+   },
+   "LOS +10%": {
+    "pct4h": 71.1,
+    "waits12h_wk": 106.9,
+    "cancel_wk": 48.2,
+    "pct4h_p5": 55.0
+   }
+  },
+  "S5 = S3 + S4": {
+   "cost_M": 1.97,
+   "base": {
+    "pct4h": 92.7,
+    "waits12h_wk": 1.0,
+    "cancel_wk": 14.8,
+    "pct4h_p5": 92.2
+   },
+   "demand +8%": {
+    "pct4h": 91.3,
+    "waits12h_wk": 8.3,
+    "cancel_wk": 37.6,
+    "pct4h_p5": 90.5
+   },
+   "LOS +10%": {
+    "pct4h": 91.2,
+    "waits12h_wk": 9.0,
+    "cancel_wk": 39.3,
+    "pct4h_p5": 86.2
+   }
+  },
+  "S6 = S1 + S3 (cubicles AND redesign)": {
+   "cost_M": 3.55,
+   "base": {
+    "pct4h": 92.7,
+    "waits12h_wk": 1.9,
+    "cancel_wk": 18.6,
+    "pct4h_p5": 92.2
+   },
+   "demand +8%": {
+    "pct4h": 91.5,
+    "waits12h_wk": 9.4,
+    "cancel_wk": 42.3,
+    "pct4h_p5": 90.5
+   },
+   "LOS +10%": {
+    "pct4h": 91.3,
+    "waits12h_wk": 12.0,
+    "cancel_wk": 40.4,
+    "pct4h_p5": 89.5
+   }
+  }
+ },
+ "oracle": {
+  "S0 baseline": {
+   "pct4h": 77.3,
+   "waits12h_wk": 62.9,
+   "cancel_wk": 34.6
+  },
+  "S1 +10 ED cubicles (client idea)": {
+   "pct4h": 81.0,
+   "waits12h_wk": 63.1,
+   "cancel_wk": 41.9
+  },
+  "S2 +20 ward beds": {
+   "pct4h": 84.9,
+   "waits12h_wk": 29.0,
+   "cancel_wk": 17.9
+  },
+  "S3 discharge redesign (a+b+c)": {
+   "pct4h": 91.1,
+   "waits12h_wk": 9.0,
+   "cancel_wk": 33.8
+  },
+  "S4 care-home block contract": {
+   "pct4h": 73.0,
+   "waits12h_wk": 88.7,
+   "cancel_wk": 37.9
+  },
+  "S5 = S3 + S4": {
+   "pct4h": 91.9,
+   "waits12h_wk": 5.0,
+   "cancel_wk": 30.8
+  }
+ }
+}

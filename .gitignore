@@ -1,0 +1,14 @@
+# secrets and local state
+.env*
+app/data/
+.claude/
+# build output and dependencies
+node_modules/
+app/.next/
+*.tsbuildinfo
+app/next-env.d.ts
+*.pkl
+# real client/business data: kept local only (repo is public)
+engagements/002-colorland-web-sales/
+engagements/003-google-new-campaign/
+engagements/004-mvp-ux-design/holdout/ANSWER_KEY.md

@@ -1,0 +1,661 @@
+<title>Autonomous AI Consultant</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@500;600&display=swap">
+<style>
+/* Layout: a case-file dossier. App bar with four views; client view = one column file with a pinned "next step" card and a docked Ask panel. */
+:root{
+  --paper:#F4F6F7; --sheet:#FFFFFF; --ink:#14212B; --ink-2:#4A5864; --ink-3:#7A8792;
+  --line:#DCE2E6; --line-2:#C7D0D6;
+  --creek:#0E6E6B; --creek-soft:#E2F0EF; --creek-ink:#0A5452;
+  --saffron:#B7791F; --saffron-soft:#FBF1DF;
+  --ok:#1F7A45; --ok-soft:#E3F3E8; --warn:#9A5B00; --warn-soft:#FDF0D8; --bad:#B42318; --bad-soft:#FDE7E4;
+  --shadow:0 1px 2px rgba(20,33,43,.06),0 8px 24px rgba(20,33,43,.06);
+  --f-display:"IBM Plex Serif",Georgia,serif; --f-body:"IBM Plex Sans","IBM Plex Sans Arabic",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace; --f-ar:"IBM Plex Sans Arabic","IBM Plex Sans",system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#0F171D; --sheet:#16212A; --ink:#E6ECEF; --ink-2:#AAB7C0; --ink-3:#7F8E99; --line:#25333D; --line-2:#334450;
+  --creek:#3BB3AC; --creek-soft:#13302F; --creek-ink:#7AD3CD; --saffron:#E0A64B; --saffron-soft:#33270F;
+  --ok:#5CC488; --ok-soft:#12291B; --warn:#E6A84A; --warn-soft:#30230C; --bad:#F2796D; --bad-soft:#3A1714;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.25); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --paper:#0F171D; --sheet:#16212A; --ink:#E6ECEF; --ink-2:#AAB7C0; --ink-3:#7F8E99; --line:#25333D; --line-2:#334450;
+  --creek:#3BB3AC; --creek-soft:#13302F; --creek-ink:#7AD3CD; --saffron:#E0A64B; --saffron-soft:#33270F;
+  --ok:#5CC488; --ok-soft:#12291B; --warn:#E6A84A; --warn-soft:#30230C; --bad:#F2796D; --bad-soft:#3A1714;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.25); color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.55}
+[dir="rtl"] body,[lang="ar"] body{font-family:var(--f-ar)}
+h1,h2,h3{font-family:var(--f-display);font-weight:600;text-wrap:balance;margin:0;line-height:1.25}
+[lang="ar"] h1,[lang="ar"] h2,[lang="ar"] h3{font-family:var(--f-ar)}
+h2{font-size:1.25rem} h3{font-size:1.02rem}
+p{margin:0}
+button,input,textarea,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--creek);outline-offset:2px;border-radius:4px}
+.mono{font-family:var(--f-mono);font-size:.82em;font-variant-numeric:tabular-nums}
+.label{font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);font-weight:600}
+[lang="ar"] .label{letter-spacing:0}
+.muted{color:var(--ink-2)} .small{font-size:.86rem}
+.skip{position:absolute;inset-inline-start:-999px;top:8px;background:var(--ink);color:var(--paper);padding:8px 12px;z-index:99}
+.skip:focus{inset-inline-start:8px}
+
+/* App bar */
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--sheet);border-bottom:1px solid var(--line)}
+.bar-in{max-width:1180px;margin:0 auto;padding-inline:16px;padding-block:10px;display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center}
+.brand{display:flex;gap:10px;align-items:center;font-family:var(--f-display);font-weight:600;font-size:1rem}
+.mark{width:28px;height:28px;border-radius:7px;background:var(--creek);display:grid;place-items:center;color:var(--sheet);font-family:var(--f-mono);font-size:.8rem}
+.tabs{display:flex;gap:4px;overflow-x:auto;flex:1 1 auto;min-width:0;scrollbar-width:none}
+.tab{border:0;background:none;padding:8px 12px;border-radius:8px;color:var(--ink-2);cursor:pointer;white-space:nowrap;font-weight:500}
+.tab[aria-selected="true"]{background:var(--creek-soft);color:var(--creek-ink)}
+.tab:hover{color:var(--ink)}
+.bar-tools{display:flex;gap:8px;align-items:center}
+.pill-btn{border:1px solid var(--line-2);background:var(--sheet);border-radius:999px;padding:6px 12px;cursor:pointer;font-weight:500;font-size:.86rem}
+.pill-btn:hover{border-color:var(--creek)}
+
+main{max-width:1180px;margin:0 auto;padding-inline:16px;padding-block:20px 80px}
+.view[hidden]{display:none!important}
+
+/* Client layout */
+.client-grid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:24px;align-items:start}
+@media (max-width:920px){.client-grid{grid-template-columns:minmax(0,1fr)}}
+.file-head{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:baseline;justify-content:space-between;margin-block-end:14px}
+.file-head h1{font-size:1.6rem}
+.eg{display:inline-block;font-size:.72rem;font-weight:600;border:1px dashed var(--line-2);color:var(--ink-3);border-radius:6px;padding:2px 8px;vertical-align:middle}
+.demo{display:flex;gap:6px;align-items:center;flex-wrap:wrap;background:var(--sheet);border:1px solid var(--line);border-radius:10px;padding:6px 8px;margin-block-end:16px}
+.demo .seg{border:0;background:none;padding:6px 10px;border-radius:7px;cursor:pointer;color:var(--ink-2);font-size:.86rem}
+.demo .seg[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.stack{display:flex;flex-direction:column;gap:18px}
+.sheet{background:var(--sheet);border:1px solid var(--line);border-radius:14px;padding:20px}
+.sec-h{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:space-between;margin-block-end:12px}
+
+/* Next step card */
+.next{background:var(--ink);color:var(--paper);border-radius:16px;padding:20px 22px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px 20px;align-items:center;box-shadow:var(--shadow)}
+.next .label{color:color-mix(in srgb,var(--paper) 65%,transparent)}
+.next h2{font-size:1.35rem;color:var(--paper);margin-block:4px 6px}
+.next .meta{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:.88rem;color:color-mix(in srgb,var(--paper) 78%,transparent)}
+.next .go{background:var(--saffron);color:#1b1305;border:0;border-radius:10px;padding:11px 16px;font-weight:600;cursor:pointer;white-space:nowrap}
+@media (max-width:560px){.next{grid-template-columns:1fr}}
+
+/* Tracker */
+.tracker{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px;list-style:none;margin:0;padding:0}
+.tracker li{display:flex;flex-direction:column;gap:6px;font-size:.8rem;color:var(--ink-3)}
+.tracker .bar-s{height:6px;border-radius:3px;background:var(--line)}
+.tracker li.done{color:var(--ink-2)} .tracker li.done .bar-s{background:var(--creek)}
+.tracker li.now{color:var(--ink);font-weight:600} .tracker li.now .bar-s{background:var(--saffron)}
+.tracker .st{font-size:.72rem;font-weight:500}
+@media (max-width:560px){.tracker{grid-template-columns:repeat(3,minmax(0,1fr));row-gap:12px}}
+
+/* Understood */
+.und{display:grid;gap:0;margin:0}
+.und-row{display:grid;grid-template-columns:170px minmax(0,1fr) auto;gap:6px 14px;padding-block:11px;border-top:1px solid var(--line);align-items:start}
+.und-row:first-child{border-top:0}
+.und-row dt{font-weight:600;font-size:.86rem;color:var(--ink-2)}
+.und-row dd{margin:0}
+.und-row input{width:100%;border:1px solid var(--creek);border-radius:8px;padding:6px 8px;background:var(--paper)}
+@media (max-width:600px){.und-row{grid-template-columns:minmax(0,1fr) auto}.und-row dt{grid-column:1/-1}}
+.link-btn{border:0;background:none;color:var(--creek-ink);cursor:pointer;font-weight:500;padding:2px 4px;font-size:.86rem}
+.link-btn:hover{text-decoration:underline}
+.ghost{border:1px solid var(--line-2);background:var(--sheet);border-radius:9px;padding:8px 12px;cursor:pointer;font-weight:500;font-size:.88rem}
+.ghost:hover{border-color:var(--creek);color:var(--creek-ink)}
+.primary{border:0;background:var(--creek);color:#fff;border-radius:9px;padding:9px 14px;cursor:pointer;font-weight:600;font-size:.88rem}
+.primary:disabled{background:var(--line-2);color:var(--ink-3);cursor:not-allowed}
+.danger{border:1px solid var(--bad);color:var(--bad);background:var(--sheet);border-radius:9px;padding:8px 12px;cursor:pointer;font-weight:500;font-size:.88rem}
+.qver{display:inline-flex;gap:6px;align-items:center;font-size:.78rem;font-weight:600;background:var(--creek-soft);color:var(--creek-ink);border-radius:999px;padding:3px 10px}
+.changebox{border:1px solid var(--saffron);background:var(--saffron-soft);border-radius:12px;padding:16px;display:grid;gap:10px;margin-block-start:14px}
+.changebox textarea{width:100%;min-height:76px;border:1px solid var(--line-2);border-radius:8px;padding:8px;background:var(--sheet);resize:vertical}
+.scope{border:1px solid var(--line-2);border-radius:12px;padding:16px;margin-block-start:14px;display:grid;gap:10px;background:var(--paper)}
+.scope-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+@media (max-width:600px){.scope-grid{grid-template-columns:1fr}}
+.old{text-decoration:line-through;color:var(--ink-3)}
+
+/* Chips */
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:.74rem;font-weight:600;border-radius:999px;padding:3px 9px;white-space:nowrap}
+.chip::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;flex:none}
+.c-ok{background:var(--ok-soft);color:var(--ok)} .c-warn{background:var(--warn-soft);color:var(--warn)} .c-bad{background:var(--bad-soft);color:var(--bad)}
+.c-info{background:var(--creek-soft);color:var(--creek-ink)} .c-mute{background:var(--paper);color:var(--ink-2);border:1px solid var(--line)}
+.tag{display:inline-flex;gap:4px;align-items:center;font-family:var(--f-mono);font-size:.7rem;border:1px solid var(--line-2);border-radius:5px;padding:1px 6px;color:var(--ink-2);background:var(--paper);white-space:nowrap}
+.tag.assume{border-color:var(--saffron);color:var(--saffron);background:var(--saffron-soft)}
+
+/* Data checklist */
+.items{display:grid;gap:10px}
+.item{border:1px solid var(--line);border-radius:12px;padding:14px 16px;display:grid;gap:10px}
+.item.new{border-color:var(--saffron)}
+.item-top{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:space-between}
+.item-top h3{font-family:var(--f-body);font-size:.98rem;font-weight:600}
+.item-acts{display:flex;flex-wrap:wrap;gap:8px}
+.read{font-size:.86rem;color:var(--ok);background:var(--ok-soft);border-radius:8px;padding:6px 10px}
+details summary{cursor:pointer;color:var(--creek-ink);font-weight:500;font-size:.86rem}
+details[open] summary{margin-block-end:6px}
+.how{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;font-size:.88rem}
+@media (max-width:600px){.how{grid-template-columns:1fr}}
+.how ol{margin:4px 0 0;padding-inline-start:18px}
+.file-in{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+
+/* Report */
+.answer{font-family:var(--f-display);font-size:1.12rem;line-height:1.55;border-inline-start:3px solid var(--creek);padding-inline-start:14px}
+[lang="ar"] .answer{font-family:var(--f-ar)}
+.steps{display:grid;gap:0;margin-block-start:14px}
+.step-row{display:grid;grid-template-columns:120px minmax(0,1fr);gap:12px;padding-block:10px;border-top:1px solid var(--line)}
+.step-row b{font-size:.86rem}
+@media (max-width:560px){.step-row{grid-template-columns:1fr;gap:2px}}
+.finding{border:1px solid var(--line);border-radius:12px;padding:14px 16px;display:grid;gap:8px}
+.finding-top{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
+.finding p.claim{font-weight:500}
+.why{font-size:.86rem;color:var(--ink-2)}
+.exports{display:flex;flex-wrap:wrap;gap:8px}
+.signed{display:flex;gap:10px;align-items:center;font-size:.86rem;color:var(--ink-2)}
+.avatar{width:30px;height:30px;border-radius:50%;background:var(--saffron-soft);color:var(--saffron);display:grid;place-items:center;font-weight:600;font-size:.8rem;flex:none}
+.collapsed-note{font-size:.86rem;color:var(--ink-3)}
+
+/* Ask panel */
+.ask{position:sticky;top:76px;background:var(--sheet);border:1px solid var(--line);border-radius:14px;display:flex;flex-direction:column;max-height:calc(100vh - 100px);min-height:320px}
+.ask-h{padding:14px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:8px}
+.ask-log{padding:14px 16px;display:flex;flex-direction:column;gap:10px;overflow-y:auto;flex:1 1 auto}
+.msg{max-width:92%;padding:8px 12px;border-radius:12px;font-size:.9rem}
+.msg.me{align-self:flex-end;background:var(--creek);color:#fff;border-end-end-radius:4px}
+.msg.ai{align-self:flex-start;background:var(--paper);border:1px solid var(--line);border-end-start-radius:4px}
+.ask-sugg{display:flex;flex-wrap:wrap;gap:6px;padding:0 16px 10px}
+.sugg{border:1px solid var(--line-2);background:var(--sheet);border-radius:999px;padding:4px 10px;font-size:.8rem;cursor:pointer}
+.ask-f{display:flex;gap:8px;padding:12px 16px;border-top:1px solid var(--line)}
+.ask-f input{flex:1;min-width:0;border:1px solid var(--line-2);border-radius:9px;padding:8px 10px;background:var(--paper)}
+.ask-toggle{display:none}
+@media (max-width:920px){
+  .ask{position:fixed;inset-inline:0;bottom:0;top:auto;border-radius:16px 16px 0 0;max-height:70vh;min-height:0;z-index:30;box-shadow:var(--shadow);padding-bottom:env(safe-area-inset-bottom,0px)}
+  .ask.closed .ask-log,.ask.closed .ask-sugg,.ask.closed .ask-f{display:none}
+  .ask-toggle{display:inline-flex}
+}
+
+/* Approver */
+.appr-grid{display:grid;grid-template-columns:360px minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:920px){.appr-grid{grid-template-columns:minmax(0,1fr)}}
+.queue{display:grid;gap:8px}
+.q{all:unset;box-sizing:border-box;display:grid;gap:4px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--sheet);cursor:pointer}
+.q:focus-visible{outline:2px solid var(--creek)}
+.q[aria-current="true"]{border-color:var(--creek);box-shadow:inset 3px 0 0 var(--creek)}
+[dir="rtl"] .q[aria-current="true"]{box-shadow:inset -3px 0 0 var(--creek)}
+.q-top{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.q b{font-size:.92rem}
+.q .small{color:var(--ink-2)}
+.qgroup{margin-block:14px 6px}
+.budget{display:grid;gap:6px}
+.meter{height:8px;border-radius:4px;background:var(--line);overflow:hidden}
+.meter > i{display:block;height:100%;background:var(--creek)}
+.rv{border:1px solid var(--line);border-radius:12px;padding:14px 16px;display:grid;gap:10px}
+.rv.flag{border-color:var(--warn)} .rv.dispute{border-color:var(--bad)} .rv.ok{border-color:var(--ok)}
+.evid{display:grid;gap:6px;font-size:.86rem;background:var(--paper);border-radius:8px;padding:10px 12px}
+.evid div{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center}
+.rv-acts{display:flex;flex-wrap:wrap;gap:8px}
+.note{width:100%;border:1px solid var(--line-2);border-radius:8px;padding:8px;background:var(--sheet);min-height:56px}
+.release{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;border-top:1px solid var(--line);padding-top:14px}
+
+/* Behind the scenes */
+.bts-hero{display:grid;gap:8px;margin-block-end:18px}
+.bts-hero h1{font-size:1.7rem}
+.loop{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:6px;list-style:none;padding:0;margin:0}
+.loop li{border:1px solid var(--line);border-radius:10px;padding:10px 8px;text-align:center;font-size:.8rem;font-weight:600;color:var(--ink-3);background:var(--sheet);transition:background .3s,color .3s,border-color .3s}
+.loop li.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.loop li.past{color:var(--creek-ink);border-color:var(--creek)}
+@media (max-width:760px){.loop{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.replay{display:grid;gap:8px;margin-block-start:14px;max-height:420px;overflow-y:auto;padding-inline-end:4px}
+.ev{display:grid;grid-template-columns:110px minmax(0,1fr);gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--sheet);font-size:.88rem}
+.ev .stage{font-family:var(--f-mono);font-size:.7rem;font-weight:500;color:var(--creek-ink)}
+.ev.alarm{border-color:var(--bad)} .ev.alarm .stage{color:var(--bad)}
+@media (max-width:560px){.ev{grid-template-columns:1fr}}
+.world{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+.agent{border:1px solid var(--line);border-radius:12px;padding:12px;display:grid;gap:6px;background:var(--sheet)}
+.agent.blocked{border-style:dashed;opacity:.85}
+.agent b{font-size:.92rem}
+.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+@media (max-width:820px){.two{grid-template-columns:minmax(0,1fr)}}
+.bars{display:grid;gap:10px}
+.brow{display:grid;grid-template-columns:150px minmax(0,1fr) 44px;gap:10px;align-items:center;font-size:.86rem}
+.btrack{height:12px;background:var(--line);border-radius:6px;overflow:hidden;display:flex}
+.btrack i{display:block;height:100%}
+.ladder{display:grid;gap:6px}
+.rung{display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px 10px;border-radius:9px;border:1px solid var(--line);font-size:.88rem}
+.rung .lv{font-family:var(--f-mono);font-weight:500;color:var(--ink-3)}
+.rung.reached{background:var(--creek-soft);border-color:var(--creek)} .rung.reached .lv{color:var(--creek-ink)}
+.rung.partial{background:var(--saffron-soft);border-color:var(--saffron)}
+
+/* Email */
+.mail{max-width:680px;margin:0 auto;background:var(--sheet);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.mail-h{padding:16px 20px;border-bottom:1px solid var(--line);display:grid;gap:4px;font-size:.88rem}
+.mail-h b{font-size:1.02rem}
+.mail-b{padding:20px;display:grid;gap:16px}
+.kv{display:grid;grid-template-columns:150px minmax(0,1fr);gap:8px 14px;font-size:.92rem}
+.kv dt{color:var(--ink-3);font-weight:600;font-size:.84rem}
+.kv dd{margin:0}
+@media (max-width:520px){.kv{grid-template-columns:1fr;gap:2px}.kv dd{margin-block-end:8px}}
+.mail-acts{display:flex;flex-wrap:wrap;gap:10px}
+
+.toast{position:fixed;inset-inline-start:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--paper);padding:10px 16px;border-radius:10px;font-size:.88rem;z-index:50;max-width:calc(100% - 32px)}
+[dir="rtl"] .toast{transform:translateX(50%)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<a class="skip" href="#main">Skip to content</a>
+<header class="bar">
+  <div class="bar-in">
+    <div class="brand"><span class="mark" aria-hidden="true">AC</span><span data-i18n="brand">AI Consultant</span></div>
+    <nav class="tabs" role="tablist" aria-label="Views">
+      <button class="tab" role="tab" id="t-client" aria-controls="v-client" aria-selected="true" data-view="client" data-i18n="nav.client">Client case file</button>
+      <button class="tab" role="tab" id="t-approver" aria-controls="v-approver" aria-selected="false" data-view="approver" data-i18n="nav.approver">Consultant review</button>
+      <button class="tab" role="tab" id="t-bts" aria-controls="v-bts" aria-selected="false" data-view="bts" data-i18n="nav.bts">How the agent thinks</button>
+      <button class="tab" role="tab" id="t-email" aria-controls="v-email" aria-selected="false" data-view="email" data-i18n="nav.email">Buyer email</button>
+    </nav>
+    <div class="bar-tools">
+      <button class="pill-btn" id="langBtn" aria-label="Switch language to Arabic">العربية</button>
+    </div>
+  </div>
+</header>
+<div id="live" class="sr" aria-live="polite"></div>
+
+<main id="main">
+<!-- ================= CLIENT ================= -->
+<section class="view" id="v-client" role="tabpanel" aria-labelledby="t-client">
+  <div class="file-head">
+    <div>
+      <p class="label" data-i18n="file.label">Engagement 0042 · opened 13 Oct 2026</p>
+      <h1>Marina Toys growth review <span class="eg" data-i18n="eg">Example data</span></h1>
+    </div>
+    <span class="qver" id="qverTop">Question v1</span>
+  </div>
+
+  <div class="demo" role="group" aria-label="Demo timeline">
+    <span class="label" style="padding-inline:6px" data-i18n="demo">Demo timeline</span>
+    <button class="seg" data-stage="understand" aria-pressed="false" data-i18n="d.understand">Day 0 · Understand</button>
+    <button class="seg" data-stage="data" aria-pressed="true" data-i18n="d.data">Day 2 · Data</button>
+    <button class="seg" data-stage="report" aria-pressed="false" data-i18n="d.report">Day 6 · Report</button>
+  </div>
+
+  <div class="client-grid">
+    <div class="stack">
+      <section class="next" aria-labelledby="nextTitle" id="nextCard">
+        <div>
+          <p class="label" data-i18n="next.label">Your next step</p>
+          <h2 id="nextTitle"></h2>
+          <div class="meta" id="nextMeta"></div>
+        </div>
+        <button class="go" id="nextGo"></button>
+      </section>
+
+      <section class="sheet" aria-labelledby="trkH">
+        <div class="sec-h"><h2 id="trkH" data-i18n="sec.progress">Progress</h2><span class="small muted" id="trkNote"></span></div>
+        <ol class="tracker" id="tracker"></ol>
+      </section>
+
+      <section class="sheet" aria-labelledby="undH" id="undSec">
+        <div class="sec-h">
+          <h2 id="undH" data-i18n="sec.und">What we understood</h2>
+          <button class="ghost" id="changeBtn" data-i18n="btn.changed">Our question has changed</button>
+        </div>
+        <dl class="und" id="und"></dl>
+        <div id="changeArea"></div>
+      </section>
+
+      <section class="sheet" aria-labelledby="dataH" id="dataSec">
+        <div class="sec-h"><h2 id="dataH" data-i18n="sec.data">What we need from you</h2><span class="small muted" id="dataCount"></span></div>
+        <div class="items" id="items"></div>
+      </section>
+
+      <section class="sheet" aria-labelledby="repH" id="repSec">
+        <div class="sec-h"><h2 id="repH" data-i18n="sec.report">Your report</h2><span id="repState"></span></div>
+        <div id="report"></div>
+      </section>
+    </div>
+
+    <aside class="ask closed" id="ask" aria-labelledby="askH">
+      <div class="ask-h">
+        <h2 id="askH" style="font-size:1.05rem" data-i18n="ask.h">Ask your consultant</h2>
+        <button class="ghost ask-toggle" id="askToggle" aria-expanded="false" data-i18n="ask.open">Open</button>
+      </div>
+      <div class="ask-log" id="askLog">
+        <div class="msg ai">Ask anything about this engagement. Answers that would change the plan go to your consultant for approval first.</div>
+      </div>
+      <div class="ask-sugg">
+        <button class="sugg" data-q="What do you still need from me?">What do you still need?</button>
+        <button class="sugg" data-q="Why do you need product cost?">Why product cost?</button>
+        <button class="sugg" data-q="When will I get the report?">When is the report?</button>
+      </div>
+      <form class="ask-f" id="askForm">
+        <label for="askIn" class="sr">Your question</label>
+        <input id="askIn" placeholder="Type a question" autocomplete="off">
+        <button class="primary" type="submit" data-i18n="ask.send">Send</button>
+      </form>
+    </aside>
+  </div>
+</section>
+
+<!-- ================= APPROVER ================= -->
+<section class="view" id="v-approver" role="tabpanel" aria-labelledby="t-approver" hidden>
+  <div class="file-head">
+    <div><p class="label">Monday 20 Oct 2026 · 7 live engagements</p><h1 data-i18n="appr.h">Needs you</h1></div>
+    <span class="eg">Example data</span>
+  </div>
+  <div class="appr-grid">
+    <div>
+      <div class="queue" id="queue"></div>
+    </div>
+    <div class="sheet" id="review" aria-live="off"></div>
+  </div>
+</section>
+
+<!-- ================= BEHIND THE SCENES ================= -->
+<section class="view" id="v-bts" role="tabpanel" aria-labelledby="t-bts" hidden>
+  <div class="bts-hero">
+    <p class="label">Real run · engagement 004 · 13 Oct 2026</p>
+    <h1>How the agent designed this product</h1>
+    <p class="muted" style="max-width:68ch">The consultant ran its own method on the question “what should the MVP look like?”. It built a world of simulated clients, tested four designs, had an independent checker and a red team attack its result, and changed its answer. Everything below comes from that run’s decision log.</p>
+  </div>
+
+  <div class="stack">
+    <section class="sheet" aria-labelledby="loopH">
+      <div class="sec-h"><h2 id="loopH">The consulting loop</h2><button class="primary" id="replayBtn">Replay the run</button></div>
+      <ol class="loop" id="loop">
+        <li data-s="FRAME">Frame</li><li data-s="EVIDENCE">Evidence</li><li data-s="CONSTRUCT">Build world</li><li data-s="EXPLORE">Test</li>
+        <li data-s="VALIDATE">Validate</li><li data-s="DIAGNOSE">Challenge</li><li data-s="DEVIATION">Revise</li><li data-s="DECIDE">Decide</li>
+      </ol>
+      <div class="replay" id="replay" aria-live="polite"></div>
+    </section>
+
+    <section class="sheet" aria-labelledby="worldH">
+      <div class="sec-h"><h2 id="worldH">The simulated world</h2><span class="small muted">9 people · 5 organisations · each ran in its own context</span></div>
+      <div class="world" id="world"></div>
+    </section>
+
+    <div class="two">
+      <section class="sheet" aria-labelledby="parH">
+        <div class="sec-h"><h2 id="parH">The red team changed the answer</h2></div>
+        <p class="small muted" style="margin-block-end:12px">Round 1 gave the case-file design extra features. The red team caught it. Round 2 gave every design the same features and hid the names. Share of client personas who finished without help:</p>
+        <div class="bars" id="bars"></div>
+        <p class="small muted" style="margin-block-start:12px">The case file still wins, by less. The wizard with a dashboard comes last in both rounds.</p>
+      </section>
+
+      <section class="sheet" aria-labelledby="valH">
+        <div class="sec-h"><h2 id="valH">How far the evidence goes</h2></div>
+        <div class="ladder">
+          <div class="rung reached"><span class="lv">A</span><span>Software works as intended</span><span class="chip c-ok">Prototype</span></div>
+          <div class="rung reached"><span class="lv">B</span><span>Simulated users behave plausibly</span><span class="chip c-ok">Reached</span></div>
+          <div class="rung partial"><span class="lv">C</span><span>Matches real client behaviour</span><span class="chip c-warn">Partly · 3.5 of 6</span></div>
+          <div class="rung"><span class="lv">D</span><span>Design causes better outcomes</span><span class="chip c-mute">Needs real users</span></div>
+          <div class="rung"><span class="lv">E</span><span>Holds up across client types</span><span class="chip c-mute">Not tested</span></div>
+        </div>
+        <p class="small muted" style="margin-block-start:12px">The simulated shop owner failed to predict that the real client changed the question two hours in. So the product now has an explicit “Our question has changed” path.</p>
+      </section>
+    </div>
+  </div>
+</section>
+
+<!-- ================= EMAIL ================= -->
+<section class="view" id="v-email" role="tabpanel" aria-labelledby="t-email" hidden>
+  <p class="label" style="text-align:center;margin-block-end:12px">What the business owner receives. No login needed.</p>
+  <article class="mail" aria-labelledby="mailSubj">
+    <div class="mail-h">
+      <span class="muted">From: Your AI Consultant &lt;updates@consultant.example&gt;</span>
+      <span class="muted">To: Owner, Marina Toys (example)</span>
+      <b id="mailSubj">Weekly update · Marina Toys growth review · your question changed</b>
+    </div>
+    <div class="mail-b">
+      <dl class="kv">
+        <dt>Question</dt><dd><span class="old">Which Google campaign should we add soon?</span><br>How do we grow Google sales if ride-on stock runs short for months? <span class="qver">v2</span></dd>
+        <dt>Stage</dt><dd>Data · step 2 of 6</dd>
+        <dt>Waiting on</dt><dd>Rashid (your accountant): product cost file, invited 2 days ago</dd>
+        <dt>Report expected</dt><dd><span class="old">Thu 16 Oct</span> Sun 19 Oct (2 extra days for stock data)</dd>
+        <dt>Cost change</dt><dd>None</dd>
+        <dt>New data needed</dt><dd>Stock levels and supplier lead times</dd>
+      </dl>
+      <p>Reply <b>APPROVE</b> to confirm the new question, date and data list, or use the buttons below.</p>
+      <div class="mail-acts">
+        <button class="primary" id="mailApprove">Approve the change</button>
+        <button class="ghost" id="mailCall">Ask for a 15-minute call</button>
+      </div>
+      <p class="small muted" id="mailState">Signed off by your consultant before sending.</p>
+    </div>
+  </article>
+</section>
+</main>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const S={view:"client",stage:"data",lang:"en",q:1,changeOpen:false,pending:false,
+  items:{ads:"done",shop:"done",cost:"invited",stock:"missing",wa:"none"},
+  edit:null,
+  und:{problem:"Google sales may be too dependent on one product line.",idea:"Add a new Google campaign soon.",others:"Budget limits on existing campaigns; seasonal dip; price gaps against marketplaces.",measure:"Return on ad spend of at least 4.7 (break-even 3.62 plus 30%).",decision:"Which Google campaign to add before the Q4 season."},
+  fnd:{}, warn:{stale:false,untraced:false}, sel:0, mailDone:false};
+
+/* ---------- i18n (interface strings) ---------- */
+const AR={brand:"المستشار الذكي","nav.client":"ملف العميل","nav.approver":"مراجعة المستشار","nav.bts":"كيف يفكّر الوكيل","nav.email":"بريد صاحب القرار",
+ "file.label":"الملف 0042 · فُتح 13 أكتوبر 2026",eg:"بيانات مثال",demo:"الخط الزمني للعرض","d.understand":"اليوم 0 · الفهم","d.data":"اليوم 2 · البيانات","d.report":"اليوم 6 · التقرير",
+ "next.label":"خطوتك التالية","sec.progress":"التقدّم","sec.und":"ما فهمناه","btn.changed":"تغيّر سؤالنا","sec.data":"ما نحتاجه منك","sec.report":"تقريرك",
+ "ask.h":"اسأل مستشارك","ask.open":"فتح","ask.send":"إرسال","appr.h":"بانتظارك"};
+const EN={};
+const STEPS={en:["Understand","Data","Analysis","Checking","Consultant review","Report"],ar:["الفهم","البيانات","التحليل","التحقق","مراجعة المستشار","التقرير"]};
+const NEXT={
+ understand:{en:["Confirm we understood your problem","You","about 2 min","Review below"],ar:["أكّد أننا فهمنا مشكلتك","أنت","حوالي دقيقتين","راجِع أدناه"]},
+ data:{en:["Add your stock levels, then wait for Rashid","You and Rashid (accountant)","about 10 min","Go to the data list"],ar:["أضف مستويات المخزون، ثم ننتظر رشيد","أنت ورشيد (المحاسب)","حوالي 10 دقائق","اذهب إلى قائمة البيانات"]},
+ report:{en:["Your report is ready","You","about 8 min to read","Read the report"],ar:["تقريرك جاهز","أنت","حوالي 8 دقائق للقراءة","اقرأ التقرير"]},
+ waitRashid:{en:["Nothing needed from you. Rashid is preparing the cost file","Rashid (accountant)","invited 2 days ago","See the data list"],ar:["لا شيء مطلوب منك. رشيد يجهّز ملف التكلفة","رشيد (المحاسب)","دُعي قبل يومين","اعرض قائمة البيانات"]},
+ working:{en:["Nothing needed from you. We're analysing","Consultant","report expected Sun 19 Oct","See progress"],ar:["لا شيء مطلوب منك. نحن نحلّل","المستشار","التقرير متوقع الأحد 19 أكتوبر","اعرض التقدّم"]},
+ pending:{en:["Nothing needed from you. Your consultant is approving the new question","Consultant","expected by Tue 14 Oct, 10:00","See the change"],ar:["لا شيء مطلوب منك. المستشار يراجع سؤالك الجديد","المستشار","متوقع الثلاثاء 14 أكتوبر 10:00","اعرض التغيير"]}};
+function tr(){ $$("[data-i18n]").forEach(el=>{const k=el.dataset.i18n; if(!EN[k]) EN[k]=el.textContent; el.textContent=S.lang==="ar"?(AR[k]||EN[k]):EN[k];}); }
+
+/* ---------- utils ---------- */
+let tt; function toast(m){const t=$("#toast");t.textContent=m;t.hidden=false;clearTimeout(tt);tt=setTimeout(()=>t.hidden=true,3200);say(m)}
+function say(m){$("#live").textContent="";setTimeout(()=>$("#live").textContent=m,50)}
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+/* ---------- client ---------- */
+function stageIdx(){return S.pending?0:{understand:0,data:1,report:5}[S.stage]}
+function renderNext(){
+  let k=S.pending?"pending":S.stage;
+  if(k==="data"&&(S.q<2||S.items.stock!=="missing")) k=S.items.cost==="done"?"working":"waitRashid";
+  const n=NEXT[k][S.lang];
+  $("#nextTitle").textContent=n[0];
+  $("#nextMeta").innerHTML=`<span>${S.lang==="ar"?"المسؤول":"Owner"}: ${esc(n[1])}</span><span>${S.lang==="ar"?"الوقت":"Time"}: ${esc(n[2])}</span>`;
+  $("#nextGo").textContent=n[3];
+  $("#qverTop").textContent=(S.lang==="ar"?"السؤال ":"Question v")+(S.lang==="ar"?"الإصدار "+S.q:S.q)+(S.pending?(S.lang==="ar"?" · بانتظار الموافقة":" · awaiting approval"):"");
+}
+function renderTracker(){
+  const i=stageIdx(), st=STEPS[S.lang];
+  $("#tracker").innerHTML=st.map((s,j)=>{const c=j<i?"done":j===i?"now":"";const lab=j<i?(S.lang==="ar"?"تم":"Done"):j===i?(S.lang==="ar"?"الآن":"Now"):"";
+    return `<li class="${c}" ${j===i?'aria-current="step"':""}><span class="bar-s" aria-hidden="true"></span><span>${j+1}. ${s}</span><span class="st">${lab}</span></li>`}).join("");
+  $("#trkNote").textContent=S.stage==="report"&&!S.pending?(S.lang==="ar"?"اكتمل":"Complete"):(S.lang==="ar"?"متوقع الأحد 19 أكتوبر":"Report expected Sun 19 Oct");
+}
+const UND_L={problem:"Problem",idea:"Your idea",others:"Other possible causes",measure:"How we measure success",decision:"Decision to make"};
+const UND_AR={problem:"المشكلة",idea:"فكرتك",others:"أسباب محتملة أخرى",measure:"كيف نقيس النجاح",decision:"القرار المطلوب"};
+function renderUnd(){
+  $("#und").innerHTML=Object.keys(UND_L).map(k=>{
+    const lab=S.lang==="ar"?UND_AR[k]:UND_L[k];
+    if(S.edit===k) return `<div class="und-row"><dt><label for="ed-${k}">${lab}</label></dt><dd><input id="ed-${k}" value="${esc(S.und[k])}"></dd><dd><button class="link-btn" data-save="${k}">Save</button></dd></div>`;
+    return `<div class="und-row"><dt>${lab}</dt><dd>${esc(S.und[k])}</dd><dd><button class="link-btn" data-edit="${k}" aria-label="Edit ${UND_L[k]}">${S.lang==="ar"?"تعديل":"Edit"}</button></dd></div>`}).join("");
+  const ca=$("#changeArea");
+  if(S.changeOpen){
+    ca.innerHTML=`<form class="changebox" id="chForm"><label for="chText"><b>What changed?</b> <span class="muted small">Say it in your own words. We will show you what it changes before anything restarts.</span></label>
+    <textarea id="chText">The real worry is that ride-on stock may run short for months. We need to know how to grow Google sales without ride-ons.</textarea>
+    <div class="item-acts"><button class="primary" type="submit">Show me what this changes</button><button class="ghost" type="button" id="chCancel">Cancel</button></div></form>`;
+  } else if(S.q===2){
+    ca.innerHTML=`<div class="scope" aria-labelledby="scH"><div class="sec-h" style="margin:0"><h3 id="scH">Scope change record · v1 → v2</h3>${S.pending?'<span class="chip c-warn">Waiting for consultant approval</span>':'<span class="chip c-ok">Approved by consultant</span>'}</div>
+    <div class="scope-grid">
+      <div><p class="label">Before</p><p class="old">Which Google campaign should we add soon?</p></div>
+      <div><p class="label">Now</p><p>How do we grow Google sales if ride-on stock runs short for months?</p></div>
+      <div><p class="label">Data now needed</p><p>+ Stock levels by product<br>+ Supplier lead times</p></div>
+      <div><p class="label">Still valid</p><p>Google Ads and Shopify data already connected</p></div>
+      <div><p class="label">Report date</p><p><span class="old">Thu 16 Oct</span> Sun 19 Oct</p></div>
+      <div><p class="label">Cost</p><p>No change</p></div>
+    </div>
+    <p class="small muted">Asked by the owner on 13 Oct, 15:20. The weekly email to the business owner includes this change.</p>
+    ${S.pending?'<div><button class="ghost" id="simApprove">Demo: consultant approves</button></div>':""}</div>`;
+  } else ca.innerHTML="";
+}
+const ITEMS=[
+ {id:"ads",need:"must",name:"Google Ads and Analytics",why:"To see which campaigns earn back their cost, by product.",how:["Press Connect account","Sign in with the Google account that runs your ads","Choose Marina Toys"],read:"We read 92 days (1 Jul to 30 Sep 2026), 14 campaigns, 1,847 products."},
+ {id:"shop",need:"must",name:"Shopify orders",why:"To see order values and which products sell together.",how:["Press Connect account","Approve read-only access in Shopify"],read:"We read 703 orders (12 Sep to 12 Oct 2026)."},
+ {id:"cost",need:"must",name:"Product cost per item",why:"Sales are not profit. We need cost to tell you which campaigns actually make money.",how:["In Odoo, open Inventory, then Products","Select all, then Export","Tick Internal Reference, Name and Cost"],who:"Rashid (accountant)"},
+ {id:"stock",need:"must",name:"Stock levels and supplier lead times",why:"Your new question is about running out of ride-ons. We need to know what you can still sell, and when new stock arrives.",how:["In Odoo, open Inventory, then Reporting, then Stock","Export product, quantity on hand and incoming date","Or upload any spreadsheet with those columns"],isNew:true},
+ {id:"wa",need:"help",name:"WhatsApp enquiries per day",why:"Some ad clicks become WhatsApp chats, not website orders.",how:["Ask your sales team how many chats they get per day"],instead:"You said you don't have this. We will use website clicks on the WhatsApp button instead, marked as an estimate."}];
+function renderItems(){
+  const list=ITEMS.filter(it=>!(it.isNew&&S.q<2));
+  const open=list.filter(it=>it.need==="must"&&!["done"].includes(S.items[it.id])).length;
+  $("#dataCount").textContent=open?`${open} must-have ${open===1?"item":"items"} open`:"All must-have data received";
+  $("#items").innerHTML=list.map(it=>{
+    const s=S.items[it.id]; let state,body="";
+    if(s==="done"){state='<span class="chip c-ok">Received</span>';body=`<p class="read">${esc(it.read)}</p>`}
+    else if(s==="invited"){state='<span class="chip c-warn">Waiting on '+esc(it.who)+'</span>';body=`<p class="small muted">Invited 2 days ago. They have a data-only login and cannot see your report.</p><div class="item-acts"><button class="ghost" data-remind="${it.id}">Send Rashid a reminder</button><label class="ghost" for="f-${it.id}">Upload it myself</label><input class="file-in" type="file" id="f-${it.id}" data-file="${it.id}"></div>`}
+    else if(s==="none"){state='<span class="chip c-mute">You don\'t have this</span>';body=`<p class="small muted">${esc(it.instead)}</p>`}
+    else {state='<span class="chip c-bad">Missing</span>';body=`<div class="item-acts"><label class="primary" for="f-${it.id}" style="display:inline-block">Upload file</label><input class="file-in" type="file" id="f-${it.id}" data-file="${it.id}" accept=".csv,.xlsx,.xls,.txt"><button class="ghost" data-connect="${it.id}">Connect Odoo</button><button class="ghost" data-invite="${it.id}">Someone else has this</button><button class="ghost" data-none="${it.id}">We don't have it</button></div>`}
+    if(s==="read") {state='<span class="chip c-ok">Received</span>';body=`<p class="read">${esc(it.read)}</p>`}
+    return `<article class="item ${it.isNew?"new":""}" aria-labelledby="h-${it.id}"><div class="item-top"><h3 id="h-${it.id}">${esc(it.name)}${it.isNew?' <span class="chip c-info">Added by question v2</span>':""}</h3><div class="item-acts">${it.need==="must"?'<span class="chip c-info">Must have</span>':'<span class="chip c-mute">Helpful</span>'}${state}</div></div>
+    ${body}<details><summary>Why we need it and how to get it</summary><div class="how"><div><p class="label">Why</p><p>${esc(it.why)}</p></div><div><p class="label">How</p><ol>${it.how.map(h=>`<li>${esc(h)}</li>`).join("")}</ol></div></div></details></article>`}).join("");
+}
+function renderReport(){
+  const r=$("#report");
+  if(S.stage!=="report"||S.pending){$("#repState").innerHTML='<span class="chip c-mute">Not ready yet</span>';
+    r.innerHTML=`<p class="collapsed-note">Your report appears here when your consultant has checked and approved it. Expected Sun 19 Oct. We will email you; nothing to watch.</p>`;return}
+  $("#repState").innerHTML='<span class="chip c-ok">Approved · 19 Oct</span>';
+  const F=[
+   {c:"Strong",cls:"c-ok",t:"Your dependence on ride-ons is growing.",n:[["28% → 41%","GA4 · Jul–Oct 2026"],["6 of top 15","Odoo stock · 12 Oct"]],w:"Seen directly in your sales data across three periods.",m:"Nothing needed."},
+   {c:"Moderate",cls:"c-warn",t:"Compact gifts at AED 300–600 earn back their ad cost best, after ride-ons.",n:[["ROAS 5.0–6.2","GA4 + Merchant Center · 2 periods"],["4.7 target","ASSUMPTION · break-even 3.62 + 30%",1]],w:"Held in two separate periods and a test period, but cost per click was assumed equal across price bands.",m:"Your real cost per product (from Rashid) would make this Strong."},
+   {c:"Weak",cls:"c-bad",t:"Late December beats White Friday week for non-ride-on sales.",n:[["14–24 Dec","Simulated shoppers · hypothesis"]],w:"Came from questioning simulated shoppers. Not yet seen in your data.",m:"A two-week split test in Dubai and Sharjah."},
+   {c:"Not yet tested",cls:"c-mute",t:"Removing products under AED 100 from ads would raise profit.",n:[["ROAS 3.27","GA4 · Nov–Dec 2025"]],w:"Close to break-even once basket sales are counted. Needs a test before any change.",m:"A geo-split test, registered before launch."}];
+  r.innerHTML=`<p class="answer">No single Google campaign can replace ride-ons at your profit target. The best option, a campaign for compact gifts at AED 300–600, covers about half. Start it at a small learning budget from 26 Oct and grow it only while it earns at least 4.7 times its cost.</p>
+  <div class="steps"><div class="step-row"><b>Now</b><span>Send the product cost file so we can confirm the 300–600 result on real costs. No ad spend yet.</span></div>
+  <div class="step-row"><b>From 26 Oct</b><span>Launch “Gifts 300–600: Compact” at AED 100–150 per day. Pause after 14 days if it earns under 3.62.</span></div>
+  <div class="step-row"><b>20 Nov–24 Dec</b><span>Scale while the last 7 days stay at 4.7 or above. Keep Abu Dhabi out for two weeks to measure the real effect.</span></div></div>
+  <h3 style="margin-block:18px 10px">How sure are we?</h3>
+  <div class="items">${F.map((f,i)=>`<article class="finding"><div class="finding-top"><span class="chip ${f.cls}">${f.c}</span><button class="link-btn" data-askf="${i}">Ask about this</button></div>
+   <p class="claim">${esc(f.t)}</p><div class="item-acts">${f.n.map(x=>`<span class="tag ${x[2]?"assume":""}"><b>${esc(x[0])}</b> ${esc(x[1])}</span>`).join("")}</div>
+   <p class="why"><b>Why:</b> ${esc(f.w)} <b>To make it stronger:</b> ${esc(f.m)}</p></article>`).join("")}</div>
+  <div class="release" style="margin-block-start:16px"><div class="signed"><span class="avatar" aria-hidden="true">AQ</span><span>Checked and approved by your consultant, Aqeel, on 19 Oct. Every number links to its source.</span></div>
+  <div class="exports"><button class="ghost" data-exp="Word (English)">Word · EN</button><button class="ghost" data-exp="PDF (Arabic)">PDF · العربية</button></div></div>`;
+}
+function renderClient(){renderNext();renderTracker();renderUnd();renderItems();renderReport();
+  $$(".demo .seg").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.stage===S.stage)));}
+
+/* Ask */
+function answer(q){
+  const l=q.toLowerCase();
+  if(l.includes("still need")||l.includes("what do you need")){
+    const open=ITEMS.filter(it=>!(it.isNew&&S.q<2)&&it.need==="must"&&S.items[it.id]!=="done").map(it=>`${it.name} (${S.items[it.id]==="invited"?"waiting on Rashid":"missing"})`);
+    return open.length?"Still needed: "+open.join("; ")+".":"Nothing. We have all must-have data.";}
+  if(l.includes("cost")) return "Sales are not profit. With your cost per product we can tell which campaigns make money, not just revenue. Rashid has a data-only invite; he can't see your report.";
+  if(l.includes("when")||l.includes("report")) return S.stage==="report"?"It is ready now, at the bottom of this page.":"Expected Sun 19 Oct, if Rashid's file arrives by Wednesday. We will email you when it is ready.";
+  if(l.includes("change")||l.includes("actually")||l.includes("real ")) {setTimeout(()=>{S.changeOpen=true;renderUnd();$("#chText")?.focus()},300);return "That sounds like your question has changed. I've opened the change form so you can see the effect before anything restarts.";}
+  return "Good question. I've sent it to your consultant because it could change the plan. You'll get an answer within one working day.";}
+function ask(q){if(!q.trim())return;const log=$("#askLog");log.insertAdjacentHTML("beforeend",`<div class="msg me">${esc(q)}</div>`);
+  const a=answer(q);setTimeout(()=>{log.insertAdjacentHTML("beforeend",`<div class="msg ai">${esc(a)}</div>`);log.scrollTop=log.scrollHeight;say(a)},350);log.scrollTop=log.scrollHeight;
+  const ak=$("#ask");if(ak.classList.contains("closed")&&matchMedia("(max-width:920px)").matches){ak.classList.remove("closed");$("#askToggle").setAttribute("aria-expanded","true");$("#askToggle").textContent="Close"}}
+
+/* ---------- approver ---------- */
+const Q=[
+ {g:"Needs you now",chip:["c-bad","Checker disagrees"],t:"Marina Toys · report",d:"Finding 2 disputed · 1 old file · ready 2 h ago",kind:"report"},
+ {g:"Needs you now",chip:["c-warn","Question changed"],t:"Marina Toys · scope v2",d:"Client changed the question after you approved v1",kind:"scope"},
+ {g:"Needs you now",chip:["c-bad","Client silent 4 days"],t:"Atlas Manufacturing",d:"Analyst invite not accepted · last activity Thu",kind:"silent"},
+ {g:"Needs you now",chip:["c-info","Framing to approve"],t:"Gulf Cafés",d:"5 lines · about 4 min",kind:"framing"},
+ {g:"Expected waits (no alarm)",chip:["c-mute","Day 9 of ~21"],t:"Al Waha Clinic",d:"Waiting on hospital data-protection approval",kind:"wait"},
+ {g:"Working (no action)",chip:["c-mute","Analysis"],t:"Desert Logistics",d:"Report expected Wed 22 Oct",kind:"wait"},
+ {g:"Working (no action)",chip:["c-mute","Checking"],t:"Noor Clinics",d:"Independent checker running",kind:"wait"}];
+function renderQueue(){let g="",h="";Q.forEach((q,i)=>{if(q.g!==g){g=q.g;h+=`<p class="label qgroup">${g}</p>`}
+  h+=`<button class="q" data-q="${i}" aria-current="${S.sel===i}"><span class="q-top"><b>${esc(q.t)}</b><span class="chip ${q.chip[0]}">${q.chip[1]}</span></span><span class="small">${esc(q.d)}</span></button>`});
+  $("#queue").innerHTML=h}
+const RF=[
+ {t:"Ride-on share of web revenue grew from 28% to 41%.",ev:[["28% → 41%","GA4 · pulled 12 Oct"]],ck:["ok","Checker agrees"],warn:null},
+ {t:"Compact gifts at AED 300–600 earn ROAS 5.0–6.2.",ev:[["5.0–6.2","GA4 + GMC · pulled 12 Oct"]],ck:["bad","Checker disputes: assumes equal cost per click across price bands. Allows only 9–35% higher CPC before it fails."],warn:"untraced"},
+ {t:"6 of the top 15 ride-on products are out of stock.",ev:[["6 of 15","Odoo stock export · dated 1 Sep (6 weeks old)"]],ck:["ok","Checker agrees with the file"],warn:"stale"}];
+function renderReview(){
+  const q=Q[S.sel],R=$("#review");
+  if(q.kind!=="report"){
+    const txt={scope:`<h2>Marina Toys · question v2</h2><div class="scope-grid" style="margin-block:12px"><div><p class="label">Before</p><p class="old">Which Google campaign should we add soon?</p></div><div><p class="label">Now</p><p>How do we grow Google sales if ride-on stock runs short?</p></div></div><p class="small muted">Adds 2 data items, report date +2 days, no fee change. The client has confirmed it.</p><div class="rv-acts" style="margin-block-start:12px"><button class="primary" data-act="toast:Question v2 approved. The client and the business owner have been told.">Approve v2</button><button class="ghost" data-act="toast:Sent back to the client with your note.">Ask the client to clarify</button></div>`,
+     silent:`<h2>Atlas Manufacturing</h2><p class="muted" style="margin-block:8px">The CFO invited an analyst on Thursday. The invite was never opened. Nothing else is outstanding.</p><div class="rv-acts"><button class="primary" data-act="toast:Reminder sent to the analyst, copy to the CFO.">Remind the analyst</button><button class="ghost" data-act="toast:Note sent to the CFO.">Message the CFO</button></div>`,
+     framing:`<h2>Gulf Cafés · framing</h2><dl class="und" style="margin-block:10px"><div class="und-row"><dt>Problem</dt><dd>Two newest branches lose money.</dd><dd></dd></div><div class="und-row"><dt>Client's idea</dt><dd>Close one branch.</dd><dd></dd></div><div class="und-row"><dt>Other causes</dt><dd>Rent level; staffing hours; delivery-app commission.</dd><dd></dd></div></dl><div class="rv-acts"><button class="primary" data-act="toast:Framing approved and sent to the client.">Approve framing</button></div>`,
+     wait:`<h2>${esc(q.t)}</h2><p class="muted" style="margin-block-start:8px">${esc(q.d)}. This is an expected wait, so it does not raise an alarm. You'll see it here only if it slips.</p>`}[q.kind];
+    R.innerHTML=txt;return}
+  const open=RF.filter((f,i)=>f.warn&&!S.warn[f.warn]).length;
+  R.innerHTML=`<div class="sec-h"><div><p class="label">Report review · finding by finding</p><h2>Marina Toys growth review</h2></div>
+   <div class="budget" style="min-width:180px"><span class="small muted">Your time on this engagement: 14 of 60 min</span><div class="meter" aria-hidden="true"><i style="width:23%"></i></div></div></div>
+   <div class="items">${RF.map((f,i)=>{const res=f.warn&&S.warn[f.warn];const cls=f.ck[0]==="bad"&&!res?"dispute":f.warn&&!res?"flag":"ok";
+    return `<article class="rv ${cls}" aria-labelledby="rf${i}"><p id="rf${i}"><b>${i+1}.</b> ${esc(f.t)}</p>
+    <div class="evid"><div><span class="label">Source</span>${f.ev.map(e=>`<span class="tag"><b>${esc(e[0])}</b> ${esc(e[1])}</span>`).join("")}</div>
+    <div><span class="label">Checker</span><span class="chip ${f.ck[0]==="ok"?"c-ok":"c-bad"}">${f.ck[0]==="ok"?"Agrees":"Disputes"}</span><span class="small">${esc(f.ck[1])}</span></div>
+    ${f.warn==="stale"?`<div><span class="label">Warning</span><span class="chip ${res?"c-ok":"c-warn"}">${res?"Resolved":"File is 42 days old"}</span></div>`:""}</div>
+    ${f.warn&&!res?`<div class="rv-acts">${f.warn==="stale"?`<button class="primary" data-fix="stale">Ask client for a fresh export</button><button class="ghost" data-fix="stale">Keep, and show the date in the report</button>`:`<button class="primary" data-fix="untraced">Downgrade to Moderate and add the reason</button><button class="ghost" data-fix="untraced">Send back to the AI to retest</button>`}</div>`:`<div class="rv-acts"><span class="chip c-ok">${res?"Fixed":"Ready"}</span></div>`}</article>`}).join("")}</div>
+   <div class="release" style="margin-block-start:14px"><span class="small ${open?"":"muted"}">${open?`${open} warning${open>1?"s":""} must be resolved before release`:"All findings checked. Release sends the report and a weekly email to the owner."}</span>
+   <button class="primary" id="releaseBtn" ${open?"disabled":""}>Release to client</button></div>`;
+}
+
+/* ---------- behind the scenes ---------- */
+const LOG=[
+ ["FRAME","Client asked for an MVP design. Their claim, “UI/UX matters most”, is treated as one hypothesis among six."],
+ ["EVIDENCE","Mined real client behaviour from two earlier real engagements: six observed facts, kept hidden as an answer key."],
+ ["VALIDATE","Wrote the pass rules before any test, then locked the answer key so no simulated person could read it."],
+ ["CONSTRUCT","Built a world: 7 people, 5 organisations with their own rules (hospital data needs 2–6 weeks of approval)."],
+ ["EXPLORE","Round 1: 7 people each tested 3 designs in their own separate context. Case file wins 4 of 6."],
+ ["VALIDATE","Independent checker: calibration passed but was too easy. Real-client replay failed, 3.5 of 6.",1],
+ ["DIAGNOSE","Red team: the case file was described with extra features. The comparison was unfair.",1],
+ ["DIAGNOSE","The simulated shop owner missed that the real client changed the question mid-way. New rule: the product needs a “question changed” path."],
+ ["DEVIATION","Round 2: same features for every design, names hidden, a mid-way question change injected, two new people added."],
+ ["EXPLORE","Round 2 result: case file and chat-then-page tie at 2 of 3. Case file has fewer stuck points. Wizard is last again."],
+ ["DEVIATION","Two simulated people could not run: blocked by the session’s permissions. Reported, not worked around.",1],
+ ["DECIDE","Recommend the case file + “question changed” + Ask box + buyer email. Evidence level B. Next: 5 real users."]];
+let rp=null;
+function renderBTS(){
+  const W=[["Shop owner","UAE toy e-commerce, phone in 15-min bursts","ran"],["Hospital director","Patient data needs DPO sign-off","ran"],["Policy officer","Arabic-first, government rules","ran"],["CFO","Skeptical, delegates to an analyst","ran"],["Startup founder","Almost no data","ran"],["Analyst, screen reader","NVDA, keyboard only","ran"],["Consultant (you)","Approves everything, 1 h per client","ran in round 1"],["Café owner","Loves chat and voice notes","blocked"],["Hospital CEO","Never logs in; email and PDF only","ran"]];
+  $("#world").innerHTML=W.map(w=>`<div class="agent ${w[2]==="blocked"?"blocked":""}"><b>${w[0]}</b><span class="small muted">${w[1]}</span><span class="chip ${w[2]==="blocked"?"c-bad":"c-ok"}">${w[2]==="blocked"?"Blocked by permissions":"Ran · "+w[2].replace("ran","").trim()||"Ran"}</span></div>`).join("").replace(/Ran · <\/span>/g,"Ran</span>");
+  const B=[["Case file",4/6,2/3],["Chat",1/6,1/3],["Wizard + dashboard",0,0],["Chat, then page",null,2/3]];
+  $("#bars").innerHTML=`<div class="brow small"><span></span><span class="muted"><span class="tag">Round 1</span> <span class="tag assume">Round 2</span></span><span></span></div>`+B.map(b=>`<div class="brow"><span>${b[0]}</span><div style="display:grid;gap:4px"><div class="btrack" aria-label="Round 1 ${b[1]===null?"not tested":Math.round(b[1]*100)+"%"}"><i style="width:${(b[1]||0)*100}%;background:var(--ink-3)"></i></div><div class="btrack" aria-label="Round 2 ${Math.round(b[2]*100)}%"><i style="width:${b[2]*100}%;background:var(--saffron)"></i></div></div><span class="mono">${b[1]===null?"–":Math.round(b[1]*100)+"%"}<br>${Math.round(b[2]*100)}%</span></div>`).join("");
+  showLog(LOG.length,false);
+}
+function showLog(n,anim){
+  $("#replay").innerHTML=LOG.slice(0,n).map(e=>`<div class="ev ${e[2]?"alarm":""}"><span class="stage">${e[0]}</span><span>${esc(e[1])}</span></div>`).join("");
+  const cur=LOG[n-1]?.[0];const order=$$("#loop li").map(l=>l.dataset.s);
+  $$("#loop li").forEach(l=>{l.classList.toggle("on",anim&&l.dataset.s===cur);l.classList.toggle("past",!anim||LOG.slice(0,n).some(e=>e[0]===l.dataset.s)&&l.dataset.s!==cur)});
+  if(anim){const r=$("#replay");r.scrollTop=r.scrollHeight}}
+function replay(){clearInterval(rp);let n=0;$("#replayBtn").textContent="Replaying…";
+  rp=setInterval(()=>{n++;showLog(n,true);if(n>=LOG.length){clearInterval(rp);$("#replayBtn").textContent="Replay the run";setTimeout(()=>showLog(LOG.length,false),1200)}},matchMedia("(prefers-reduced-motion:reduce)").matches?50:900)}
+
+/* ---------- views & events ---------- */
+function setView(v){S.view=v;$$(".tab").forEach(t=>t.setAttribute("aria-selected",String(t.dataset.view===v)));
+  $$(".view").forEach(s=>s.hidden=s.id!=="v-"+v);
+  if(v==="approver"){renderQueue();renderReview()} if(v==="bts")renderBTS(); try{localStorage.setItem("ac-view",v)}catch(e){} window.scrollTo(0,0)}
+document.addEventListener("click",e=>{
+  const t=e.target.closest("button,label");if(!t)return;const d=t.dataset;
+  if(d.view) setView(d.view);
+  if(d.stage){S.stage=d.stage;if(d.stage==="report"){S.items.cost="done";S.items.stock="done";ITEMS[2].read=ITEMS[2].read||"We read 1,912 products with cost (exported 15 Oct).";ITEMS[3].read=ITEMS[3].read||"We read 1,204 products with stock and 38 incoming orders.";if(S.q<2){S.q=2}S.pending=false}renderClient();say("Showing "+t.textContent)}
+  if(t.id==="nextGo"){const tgt=S.pending?"#undSec":{understand:"#undSec",data:"#dataSec",report:"#repSec"}[S.stage];$(tgt).scrollIntoView({behavior:"smooth",block:"start"});$(tgt).querySelector("h2").setAttribute("tabindex","-1");$(tgt).querySelector("h2").focus({preventScroll:true})}
+  if(d.edit){S.edit=d.edit;renderUnd();$("#ed-"+d.edit)?.focus()}
+  if(d.save){S.und[d.save]=$("#ed-"+d.save).value;S.edit=null;renderUnd();toast("Saved. Your consultant will see the change.")}
+  if(t.id==="changeBtn"){S.changeOpen=true;renderUnd();$("#chText").focus()}
+  if(t.id==="chCancel"){S.changeOpen=false;renderUnd()}
+  if(t.id==="simApprove"){S.pending=false;renderClient();toast("Your consultant approved question v2.")}
+  if(d.remind) toast("Reminder sent to Rashid by email.");
+  if(d.invite){S.items[d.invite]="invited";ITEMS.find(i=>i.id===d.invite).who="your ops manager";renderItems();toast("Invite sent. They get a data-only login.")}
+  if(d.none){S.items[d.none]="none";const it=ITEMS.find(i=>i.id===d.none);it.instead=it.instead||"Noted. We will estimate stock from the last 90 days of sales and mark it as an assumption. Supplier dates will be shown as unknown.";renderItems();toast("Noted. The report will say this was estimated.")}
+  if(d.connect){S.items[d.connect]="done";const it=ITEMS.find(i=>i.id===d.connect);it.read=it.read||"Connected to Odoo. We read 1,204 products with stock and 38 incoming purchase orders.";renderItems();renderNext();toast("Odoo connected.")}
+  if(d.askf!==undefined) ask("Can you explain finding "+(+d.askf+1)+"?");
+  if(d.exp) toast(d.exp+" export is simulated in this prototype.");
+  if(d.q!==undefined&&t.classList.contains("q")){S.sel=+d.q;renderQueue();renderReview();if(matchMedia("(max-width:920px)").matches)$("#review").scrollIntoView({behavior:"smooth"})}
+  if(d.q&&t.classList.contains("sugg")) ask(d.q);
+  if(d.fix){S.warn[d.fix]=true;renderReview();toast("Resolved. Logged in the approval record.")}
+  if(t.id==="releaseBtn") toast("Released to Marina Toys. Approval record signed and saved.");
+  if(d.act&&d.act.startsWith("toast:")) toast(d.act.slice(6));
+  if(t.id==="replayBtn") replay();
+  if(t.id==="askToggle"){const a=$("#ask"),c=a.classList.toggle("closed");t.setAttribute("aria-expanded",String(!c));t.textContent=c?(S.lang==="ar"?"فتح":"Open"):"Close"}
+  if(t.id==="mailApprove"){$("#mailState").textContent="Approved by reply at 09:12. The consultant can restart work on question v2.";toast("Change approved from the email.")}
+  if(t.id==="mailCall") toast("Call request sent. Your consultant will reply with times.");
+  if(t.id==="langBtn"){S.lang=S.lang==="en"?"ar":"en";document.documentElement.lang=S.lang;document.documentElement.dir=S.lang==="ar"?"rtl":"ltr";t.textContent=S.lang==="ar"?"English":"العربية";t.setAttribute("aria-label",S.lang==="ar"?"Switch language to English":"Switch language to Arabic");tr();renderClient();toast(S.lang==="ar"?"تم التبديل إلى العربية. في هذا النموذج تُترجم الواجهة، والمحتوى الكامل بالعربية في المنتج.":"Switched to English.")}
+});
+document.addEventListener("submit",e=>{e.preventDefault();
+  if(e.target.id==="askForm"){const i=$("#askIn");ask(i.value);i.value=""}
+  if(e.target.id==="chForm"){S.changeOpen=false;S.q=2;S.pending=true;renderClient();toast("Change recorded as question v2. Your consultant will approve it before work restarts.");$("#scH")?.setAttribute("tabindex","-1");$("#scH")?.focus()}
+});
+document.addEventListener("change",e=>{const f=e.target;if(!f.dataset||!f.dataset.file||!f.files[0])return;const file=f.files[0],id=f.dataset.file;
+  const done=rows=>{const it=ITEMS.find(i=>i.id===id);it.read=`We read ${rows.toLocaleString()} rows from “${file.name}”. Columns look right.`;S.items[id]="done";renderItems();renderNext();toast(it.read)};
+  if(/\.(csv|txt)$/i.test(file.name)){const r=new FileReader();r.onload=()=>done(Math.max(0,String(r.result).split(/\r?\n/).filter(Boolean).length-1));r.readAsText(file)}else done(Math.max(1,Math.round(file.size/90)))});
+document.addEventListener("keydown",e=>{if(e.target.classList?.contains("tab")&&["ArrowRight","ArrowLeft"].includes(e.key)){const tabs=$$(".tab"),i=tabs.indexOf(e.target),dir=(e.key==="ArrowRight")!==(document.documentElement.dir==="rtl")?1:-1,n=tabs[(i+dir+tabs.length)%tabs.length];n.focus();setView(n.dataset.view)}});
+
+tr();renderClient();
+let start="client";try{start=localStorage.getItem("ac-view")||"client"}catch(e){}
+const h=location.hash.replace("#","");if(["client","approver","bts","email"].includes(h))start=h;
+setView(start);
+</script>

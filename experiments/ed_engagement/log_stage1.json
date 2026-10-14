@@ -1,0 +1,87 @@
+[
+ {
+  "stage": "FRAME",
+  "action": "Interpret brief",
+  "client_claim": "\"ED overcrowded; buy 10 more ED cubicles\"",
+  "symptom": "4-hour target breached, long waits",
+  "client_cause_hypothesis": "ED has too few cubicles (UNTESTED - treated as one hypothesis among several)",
+  "competing_hypotheses": [
+   "ED cubicle capacity at peak hours",
+   "exit block: admitted patients board in ED for want of ward beds",
+   "ward discharge process timing",
+   "demand growth"
+  ],
+  "objectives": "primary: % within 4h, 12h waits; guardrails: elective cancellations, cost/yr, safety"
+ },
+ {
+  "stage": "EVIDENCE",
+  "action": "Request critical evidence (ranked by power to change the decision)",
+  "critical": [
+   "patient-level ED timestamps: arrival, seen, treated, departed, admitted flag",
+   "ward admissions & discharges with source (ED/elective)",
+   "elective cancellations",
+   "bed & cubicle counts"
+  ],
+  "useful_later": [
+   "discharge-process timestamps (medically fit, decision, TTO)",
+   "care-home placement waits"
+  ],
+  "not_requested": "staff rosters, case-mix codes (would not change the cubicles-vs-beds decision yet)"
+ },
+ {
+  "stage": "EVIDENCE",
+  "action": "Client supplied level-1 records",
+  "ed_rows": 18033,
+  "ward_rows": 5096,
+  "split": "weeks 1-8 calibration / weeks 9-12 FROZEN holdout",
+  "observed_train": {
+   "pct4h": 89.5,
+   "waits12h_wk": 15.4,
+   "board_h": 0.8,
+   "cancel_wk": 20.0,
+   "arr_day": 210.9
+  }
+ },
+ {
+  "stage": "CONSTRUCT",
+  "action": "Model v1: ED-only queue (cheapest model consistent with client framing)",
+  "params": {
+   "treat_mean_h": 1.98,
+   "p_admit": 0.26,
+   "trend_per_week": 0.0009
+  }
+ },
+ {
+  "stage": "VALIDATE",
+  "action": "v1: validity A/B/C",
+  "A": "pass",
+  "B": "FAIL {'pct4h': 92.38031018206338, 'waits12h_wk': 0.0, 'board_h': 0.0, 'cancel_wk': 0.0, 'arr_day': 211.85714285714286}",
+  "C": "FAIL",
+  "detail": {
+   "pct4h": "obs 53.7 vs pred 93.0 [92.5, 93.3] -> FAIL",
+   "waits12h_wk": "obs 351.8 vs pred 0.8 [0.2, 1.5] -> FAIL",
+   "board_h": "obs 3.6 vs pred 0.0 [0.0, 0.0] -> FAIL",
+   "cancel_wk": "obs 47.5 vs pred 0.0 [0.0, 0.0] -> FAIL"
+  }
+ },
+ {
+  "stage": "CONSTRUCT",
+  "action": "Model v2: ED + ward with boarding; ward stay resampled from observed stays",
+  "electives_per_weekday": 14
+ },
+ {
+  "stage": "VALIDATE",
+  "action": "v2: validity A/B/C",
+  "A": "pass",
+  "B": "FAIL {'pct4h': 93.27385037748799, 'waits12h_wk': 0.5, 'board_h': 0.0, 'cancel_wk': 0.0, 'arr_day': 208.14285714285714, 'pct_dis_before_noon': 14.9, 'pct_dis_weekend': 31.2}",
+  "C": "FAIL",
+  "detail": {
+   "pct4h": "obs 53.7 vs pred 89.9 [79.9, 92.9] -> FAIL",
+   "waits12h_wk": "obs 351.8 vs pred 5.1 [0.5, 25.8] -> FAIL",
+   "board_h": "obs 3.6 vs pred 0.6 [0.0, 1.7] -> FAIL",
+   "cancel_wk": "obs 47.5 vs pred 15.7 [0.5, 34.0] -> FAIL",
+   "pct_dis_before_noon": "obs 2.5 vs pred 15.6 [14.5, 16.3] -> FAIL",
+   "pct_dis_weekend": "obs 16.2 vs pred 29.7 [27.0, 31.3] -> FAIL"
+  }
+ }
+]
