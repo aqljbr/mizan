@@ -2,7 +2,7 @@ import { db } from "../db";
 import { appendEvent } from "../events";
 import { generateJson, S } from "../engine/llm";
 import { caseContext, langRule } from "../engine/context";
-import { loadTable, runQuery, runList, untracedNumbers, untracedAgainst, type Query, type Result, type ListSpec, type ListResult } from "./query";
+import { loadTable, runQuery, runList, withJoin, untracedNumbers, untracedAgainst, type Query, type Result, type ListSpec, type ListResult } from "./query";
 import { runCalc, calcNumbers, type CalcInput, type CalcStep, type CalcResult } from "./calc";
 import type { Profile } from "../profile";
 
@@ -18,24 +18,35 @@ export type ExhibitRow = {
   chart: "bar" | "line" | "stacked_column" | "calc" | "list"; query: string; result: string; source: string; verified: number; unverified: string | null; at: string;
 };
 
+const JOIN = S.obj({
+  upload_id: S.int("Another file to join in by a shared identifier; 0 for none"),
+  left_column: S.str("Column in this file, e.g. owner_ssn; empty for none"),
+  right_column: S.str("Matching column in the other file, e.g. ssn; empty for none"),
+});
 const QUERY = S.obj({
   upload_id: S.int(),
   filters: S.arr(S.obj({ column: S.str(), op: S.enum(["equals", "not_equals", "contains", "greater_than", "less_than", "date_from", "date_to", "is_filled"]), value: S.str() })),
   group_by: S.str("Category column to split by, or empty"),
   time_bucket: S.enum(["none", "month", "quarter", "week", "year"]),
   date_column: S.str("Date column when time_bucket is not none, else empty"),
-  measure: S.enum(["sum", "count", "average", "share_of_total"]),
-  measure_column: S.str("Numeric column, empty for count"),
+  measure: S.enum(["sum", "count", "average", "share_of_total", "rate"], "rate = % of rows in each group where rate_column equals rate_value (e.g. churn rate by plan)"),
+  measure_column: S.str("Numeric column, empty for count or rate"),
+  rate_column: S.str("For rate: the outcome column, e.g. churned; else empty"),
+  rate_value: S.str("For rate: the value that counts, e.g. yes; else empty"),
+  join: JOIN,
+  drop_duplicates: S.bool(),
   top_n: S.int("How many groups to keep, 3 to 15"),
   min_group_size: S.int("Keep only groups with at least this many rows (e.g. 5 = accounts used 5+ times); 0 for all"),
 });
 const LIST = S.obj({
   upload_id: S.int(),
   key_column: S.str("Column whose repeated values link rows, e.g. bank_account_ref"),
-  min_group_size: S.int("Rows are listed when their key value appears at least this many times"),
+  min_group_size: S.int("2+ = list rows whose key value appears at least this many times; 1 = every row that matches the filters"),
   filters: S.arr(S.obj({ column: S.str(), op: S.enum(["equals", "not_equals", "contains", "greater_than", "less_than", "date_from", "date_to", "is_filled"]), value: S.str() })),
   show_columns: S.arr(S.str(), "Columns an investigator needs to see"),
   amount_column: S.str("Numeric column to total, or empty"),
+  join: JOIN,
+  drop_duplicates: S.bool(),
 });
 const CALC = S.obj({
   inputs: S.arr(S.obj({
@@ -44,6 +55,8 @@ const CALC = S.obj({
     source: S.enum(["table", "aggregate", "note", "assumption"]),
     agg_measure: S.enum(["sum", "average", "count"], "For aggregate"), agg_column: S.str("For aggregate: numeric column (empty for count)"),
     agg_filters: S.arr(S.obj({ column: S.str(), op: S.enum(["equals", "not_equals", "contains", "greater_than", "less_than", "date_from", "date_to", "is_filled"]), value: S.str() }), "For aggregate: conditions, e.g. audit_label equals synthetic AND ai_detector_score greater_than 0.5"),
+    agg_join: JOIN,
+    agg_drop_duplicates: S.bool(),
     agg_group_by: S.str("For aggregate with a group filter: the key column, else empty"), agg_min_group_size: S.int("For aggregate: only groups with this many rows; 0 for all"),
     upload_id: S.int("For table: the file id; else 0"),
     match_column: S.str("For table: the column that names the row"), match_value: S.str("For table: the row's name, exactly"),
@@ -128,7 +141,16 @@ Never make an exhibit that only restates one input; each calc must combine at le
 If timing matters (a target by a date, a production or sales ramp), include a run-rate calc: the average rate needed, and the rate needed for the
 rest of the period given the current rate (this reveals back-loading).
 Round in titles: whole numbers for people/families/stores, at most one decimal elsewhere. Plan exactly ${opts.count} exhibit${opts.count > 1 ? "s" : ""}. For the unused parts (query, calc or list), fill placeholders (upload_id 0, empty strings and arrays).
-Money: use the currency of the client's data and market (never assume AED). Group filters (min_group_size) find repeated identifiers.`,
+Money: use the currency of the client's data and market (never assume AED).
+SEVERAL FILES: when the answer needs two files (e.g. applications and an ID register), use "join" to bring the other file's columns onto each
+row by the shared identifier, then filter, group or list on them (e.g. list applications whose joined ssa_status is deceased, with the amount).
+DUPLICATES: if the scan found exact duplicate rows, set drop_duplicates and say so in the purpose; never silently count them twice.
+CURRENCIES: if the scan found amounts in several currencies, never add them together; filter each currency, or convert in a calc (state the rate).
+DRIVERS ("what drives X", "why do customers leave"): use measure "rate" (e.g. churn rate by support tickets), and check whether a factor still
+matters inside one level of the strongest factor (filters), because a factor can look important only because it travels with another one.
+If the code scan reports outcome drivers, chart the outcome rate by the strongest driver, and chart the rate by the factor the client blames
+inside the low-risk level of that driver (the scan's "holding … at its low-risk level" check) so the client sees whether their belief holds.
+If the code scan reports a linked group or file link, list those records (the scan's CSV holds them) rather than re-deriving them. Group filters (min_group_size) find repeated identifiers.`,
     user: `${text}\n\n${scanFacts(engagementId)}\n\nTABLES YOU CAN USE: ${JSON.stringify(brief.tables)}\nROWS OF SMALL TABLES: ${JSON.stringify(rows)}\nCLIENT NOTES: ${JSON.stringify(brief.notes)}${opts.question ? `\n\nTHE CLIENT ASKS YOU: ${opts.question}${wantsList ? "\nThe client wants the records themselves: use kind \"list\"." : ""}` : ""}`,
     schema: S.obj({ exhibits: S.arr(S.obj({ purpose: S.str("Which question this answers"), scenario: S.str("'base case' unless you changed an assumption, e.g. 'at a 75% gross margin'"), kind: S.enum(["chart", "calc", "list"]), chart: S.enum(["bar", "line", "stacked_column"]), query: QUERY, calc: CALC, list: LIST })) }),
   });
@@ -142,9 +164,10 @@ Money: use the currency of the client's data and market (never assume AED). Grou
         if (ex.kind === "list") {
           const t = brief.tables.some((b) => b.upload_id === ex.list.upload_id) ? await loadTable(ex.list.upload_id) : null;
           if (!t) { errors.push(`${ex.purpose}: unknown file ${ex.list.upload_id}`); continue; }
-          const r = runList(t, ex.list);
+          const tj = await withJoin(t, ex.list.join);
+          const r = runList(tj, ex.list);
           if (!r.total_rows) { errors.push(`${ex.purpose}: no ${ex.list.key_column} value is shared by ${ex.list.min_group_size}+ rows`); continue; }
-          done.push({ purpose: ex.purpose, scenario: ex.scenario, kind: "list", chart: "list", query: ex.query, result: null, calc: null, list: r, file: t.file });
+          done.push({ purpose: ex.purpose, scenario: ex.scenario, kind: "list", chart: "list", query: ex.query, result: null, calc: null, list: r, file: tj.file });
         } else if (ex.kind === "calc") {
           const r = await runCalc(engagementId, ex.calc.inputs, ex.calc.steps);
           // Drop calcs that only restate an input or repeat an exhibit already made.
@@ -158,9 +181,10 @@ Money: use the currency of the client's data and market (never assume AED). Grou
           const prof = JSON.parse((db().prepare("SELECT profile FROM uploads WHERE id = ?").get(ex.query.upload_id) as { profile: string }).profile) as Profile;
           const labelCol = prof.columns.find((c) => c.type === "text" && c.distinct === prof.rows);
           if (prof.rows <= 30 && labelCol && !prof.columns.some((c) => c.type === "date")) { errors.push(`${ex.purpose}: a fact list is not a chart; use it as calc inputs`); continue; }
-          const r = runQuery(t, ex.query);
+          const tj = await withJoin(t, ex.query.join);
+          const r = runQuery(tj, ex.query);
           if (r.points.length < 3) { errors.push(`${ex.purpose}: too few data points for a chart`); continue; }
-          done.push({ purpose: ex.purpose, scenario: ex.scenario, kind: "chart", chart: ex.chart, query: ex.query, result: r, calc: null, list: null, file: t.file });
+          done.push({ purpose: ex.purpose, scenario: ex.scenario, kind: "chart", chart: ex.chart, query: ex.query, result: r, calc: null, list: null, file: tj.file });
         }
       } catch (e) { errors.push(`${ex.purpose}: ${String((e as Error).message)}`); }
     }
@@ -188,7 +212,7 @@ Return the corrected versions of the failed exhibits only. Same format and rules
 
   const payload = done.map((d, i) => ({
     index: i, purpose: d.purpose, scenario: d.scenario, kind: d.kind,
-    ...(d.result ? { result: { unit: d.query.measure === "share_of_total" ? "percent of the total (values are %, not counts)" : d.query.measure === "count" ? "number of rows" : d.query.measure === "average" ? `average ${d.query.measure_column}` : `sum of ${d.query.measure_column}`, points: d.result.points.slice(0, 120), total: d.result.total, rows: d.result.rowsUsed, from: d.result.from, to: d.result.to } } : {}),
+    ...(d.result ? { result: { grouped_by: d.query.group_by || undefined, unit: d.query.measure === "share_of_total" ? "percent of the total (values are %, not counts)" : d.query.measure === "count" ? "number of rows" : d.query.measure === "average" ? `average ${d.query.measure_column}` : `sum of ${d.query.measure_column}`, points: d.result.points.slice(0, 120), total: d.result.total, rows: d.result.rowsUsed, from: d.result.from, to: d.result.to } } : {}),
     ...(d.calc ? { calculation: d.calc } : {}),
     ...(d.list ? { list: { key_column: d.list.key_column, rows_listed: d.list.total_rows, groups: d.list.groups, total_amount: d.list.total_amount, amount_column: d.list.amount_column, top_groups: d.list.top_groups } } : {}),
   }));
@@ -199,7 +223,8 @@ Return the corrected versions of the failed exhibits only. Same format and rules
 written with thousands separators in the data's own currency ($328,613; €12.4 million; 450,000,000 pesos). Use ONLY numbers present in the computed results.
 Say only what the data shows: no causes, no forecasts, no "enabling" or "because" unless the data itself shows it. For a calc, the title states the final result.
 A title is a statement of the conclusion, never an instruction ("Show…", "Calculate…"). If the scenario is not the base case, name it in the title.
-Subtitle: what is shown and the unit. ${langRule(lang)}`,
+Subtitle: what is shown and the unit. When a result is grouped_by a column, name that column in the title (never "series").
+Rates, averages and shares are never added together (a "total" of churn rates means nothing). ${langRule(lang)}`,
     user: JSON.stringify(payload),
     schema: S.obj({ exhibits: S.arr(S.obj({ title: S.str(), subtitle: S.str() })) }),
   });
@@ -210,6 +235,7 @@ Subtitle: what is shown and the unit. ${langRule(lang)}`,
     engagementId, jobId: opts.jobId,
     system: `You check consulting exhibit titles against the data behind them. A title is unsupported if it misstates a number, swaps a unit or period
 (per month vs per year, per family vs total), claims a cause, answers a different question, is an instruction rather than a conclusion,
+adds up rates, averages or shares, names the wrong group (e.g. a branch the calculation is not about), or does not state a calculation's final result,
 or hides a non-base scenario. If unsupported, write a corrected title (max 18 words)
 using only numbers in the data. ${langRule(lang)}`,
     user: JSON.stringify(payload.map((p, i) => ({ ...p, title: titles.exhibits[i]?.title ?? "" }))),
@@ -223,7 +249,14 @@ using only numbers in the data. ${langRule(lang)}`,
     const rv = review.exhibits.find((x) => x.index === i);
     const fixed = rv && !rv.supported && rv.corrected_title ? rv.corrected_title : null;
     // Long decimals read badly in a headline: round to one decimal (the check below still matches within rounding).
-    const title = (fixed ?? tt.title).replace(/\d+\.\d{2,}/g, (m) => String(Math.round(Number(m) * 10) / 10));
+    let title = (fixed ?? tt.title).replace(/\d+\.\d{2,}/g, (m) => String(Math.round(Number(m) * 10) / 10));
+    // A calculation's headline must state its final result; if it states another step's number instead, use the result.
+    if (d.calc) {
+      const f = d.calc.final.value;
+      const inTitle = (title.match(/-?\d[\d,]*(\.\d+)?/g) ?? []).map((x) => Number(x.replace(/,/g, "")));
+      const hit = inTitle.some((x) => Math.abs(Math.abs(x) - Math.abs(f)) <= Math.max(0.051, Math.abs(f) * 0.005));
+      if (!hit) title = `${d.calc.final.label}: ${Math.abs(f) >= 100 ? Math.round(f).toLocaleString("en-US") : String(Math.round(f * 10) / 10)}${/^%|percent/i.test(d.calc.final.unit) ? "%" : ` ${d.calc.final.unit}`}`;
+    }
     const listNums = (l: ListResult) => [l.total_rows, l.groups, l.total_amount ?? 0, ...l.top_groups.flatMap((g) => [g.rows, g.amount ?? 0])];
     const bad = d.calc ? untracedAgainst(title, calcNumbers(d.calc)) : d.list ? untracedAgainst(title, listNums(d.list)) : untracedNumbers(title, d.result!);
     const notes = [...(fixed ? [`${lang === "ar" ? "صُحّح العنوان" : "title corrected by the checker"}: ${rv!.problem}`] : []), ...(bad.length ? [`${lang === "ar" ? "أرقام لم تطابق الحساب" : "numbers not matched to the computation"}: ${bad.join(", ")}`] : [])];

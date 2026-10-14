@@ -1,0 +1,95 @@
+{
+ "relief_bad_ssn": {
+  "apps": 70,
+  "amount": 2301800
+ },
+ "relief_chain_ring": {
+  "apps": 48,
+  "amount": 1796000,
+  "note": "each identifier shared by only 2 apps; linked only through chains"
+ },
+ "relief_burst": "120 extra applications in the week of April 6 2020 (04/06-04/10), all via Kabbage",
+ "relief_total": {
+  "apps": 4920,
+  "amount": 190412600
+ },
+ "churn": {
+  "overall": [
+   12.2,
+   6000
+  ],
+  "tickets>=3": [
+   47.3,
+   467
+  ],
+  "tickets<3": [
+   9.2,
+   5533
+  ],
+  "cash": [
+   18.9,
+   1494
+  ],
+  "card": [
+   9.6,
+   3653
+  ],
+  "Basic": [
+   15.6,
+   1990
+  ],
+  "Plus": [
+   11.4,
+   1986
+  ],
+  "Premium": [
+   9.6,
+   2024
+  ],
+  "Basic, tickets<3": [
+   9.8,
+   1686
+  ],
+  "Premium, tickets<3": [
+   9.2,
+   2001
+  ],
+  "answer": "Price is NOT the driver: within the same ticket level, plans churn alike. Basic churns more only because it gets more tickets. Fix support (3+ tickets) and cash-payment friction; a 15% price cut would cost revenue without fixing churn."
+ },
+ "bizcase": {
+  "cash_flows": [
+   366000,
+   607500,
+   916875,
+   1311469,
+   1812980
+  ],
+  "npv_12pct": 925890,
+  "payback_years": 3.39,
+  "pays_back_within_3_years": false,
+  "answer": "NPV ≈ AED 925,890; payback ≈ 3.39 years, so NOT within 3 years"
+ },
+ "messy": {
+  "true_by_branch_Q1_Q2_AED": {
+   "ديرة": [
+    893502,
+    535909
+   ],
+   "مردف": [
+    900305,
+    906879
+   ],
+   "الكرامة": [
+    903715,
+    879431
+   ],
+   "جميرا": [
+    888510,
+    896320
+   ]
+  },
+  "deira_change_pct": -40.0,
+  "traps": "3 title rows before header; totals row at bottom; 25 duplicate rows; Jumeirah online in USD; dates DD/MM/YYYY (e.g. 13/02/2026)",
+  "true_total_AED": 6804570
+ }
+}

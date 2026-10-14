@@ -88,6 +88,16 @@ export async function correctPersona(engagementId: string, actorId: string, corr
 
 export async function askAnalyst(engagementId: string, text: string): Promise<{ reply: string; exhibitId: number | null }> {
   save(engagementId, "analyst", "you", text);
+  // "What drives X?": the code scan has already compared every factor and checked which ones survive the strongest; lead with that.
+  if (/what drives|driver|why do (customers|subscribers|users|people)|what (causes|explains)/i.test(text)) {
+    const rows = db().prepare("SELECT json FROM artifacts WHERE engagement_id = ? AND kind = 'scan' ORDER BY id DESC").all(engagementId) as { json: string }[];
+    const f = rows.flatMap((r) => (JSON.parse(r.json).findings as { kind: string; title: string; detail: string }[])).filter((x) => x.kind === "outcome_drivers" || x.kind === "outcome_confounding");
+    if (f.length) {
+      const reply = f.map((x) => `${x.title}. ${x.detail}`).join("\n\n") + "\n\n(Computed by code on every record. Ask me for a chart of any one factor, e.g. \"churn rate by support tickets\".)";
+      save(engagementId, "analyst", "agent", reply);
+      return { reply, exhibitId: null };
+    }
+  }
   const { ids, note } = await runAnalyst(engagementId, { question: text, count: 1, origin: "chat" });
   const ex = ids[0] ? (db().prepare("SELECT title FROM exhibits WHERE id = ?").get(ids[0]) as { title: string }) : null;
   let reply = ex ? ex.title : "";

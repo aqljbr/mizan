@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 // A consulting-style deck: answer first, one exhibit per slide with an action title and a source line.
 const NAVY = "0B1F33", GOLD = "A9822F", INK2 = "41505F", INK3 = "7A8590", LINE = "E4E0D6";
 const PAL = ["0B1F33", "2350D8", "A9822F", "7F8FA3", "2F7F79", "B9C4D3", "8C5A9E", "C8A96B"];
-const VERDICT: Record<string, [string, string]> = { go: ["Go", "نفّذ"], go_conditional: ["Go, with conditions", "نفّذ بشروط"], test_first: ["Test first", "اختبر أولًا"], insufficient: ["Not enough evidence", "لا تكفي الأدلة"] };
+const VERDICT: Record<string, [string, string]> = { go: ["Go", "نفّذ"], go_conditional: ["Go, with conditions", "نفّذ بشروط"], no_go: ["Don't, as proposed", "لا تنفّذ بالشكل المقترح"], test_first: ["Test first", "اختبر أولًا"], insufficient: ["Not enough evidence", "لا تكفي الأدلة"] };
 const full = (v: number) => (Math.abs(v) >= 100 ? Math.round(v).toLocaleString("en-US") : Number(v.toFixed(2)).toLocaleString("en-US"));
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {

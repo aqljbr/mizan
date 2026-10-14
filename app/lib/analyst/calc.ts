@@ -1,5 +1,5 @@
 import { db } from "../db";
-import { loadTable, runQuery } from "./query";
+import { loadTable, runQuery, withJoin, type Join } from "./query";
 import { wilson } from "./scan";
 
 // The analyst's calculator, for sizing and back-of-the-envelope models ("how much would families save per year?").
@@ -10,6 +10,8 @@ import { wilson } from "./scan";
 export type CalcInput = {
   name: string; label: string; source: "table" | "aggregate" | "note" | "assumption";
   agg_measure: "sum" | "average" | "count"; agg_column: string; agg_group_by: string; agg_min_group_size: number; // source = aggregate
+  agg_join?: Join;
+  agg_drop_duplicates?: boolean;
   agg_filters?: { column: string; op: "equals" | "not_equals" | "contains" | "greater_than" | "less_than" | "date_from" | "date_to" | "is_filled"; value: string }[];
   upload_id: number; match_column: string; match_value: string; value_column: string; // source = table
   item_id: number;                                                                        // source = note
@@ -99,7 +101,7 @@ export async function runCalc(engagementId: string, inputs: CalcInput[], steps: 
       const own = db().prepare("SELECT 1 FROM uploads WHERE id = ? AND engagement_id = ?").get(inp.upload_id, engagementId);
       const t = own ? await loadTable(inp.upload_id) : null;
       if (!t) throw new Error(`Input "${inp.label}": file ${inp.upload_id} not found`);
-      const r = runQuery(t, { upload_id: inp.upload_id, filters: inp.agg_filters ?? [], group_by: inp.agg_min_group_size > 1 ? inp.agg_group_by : "", time_bucket: "none", date_column: "",
+      const r = runQuery(await withJoin(t, inp.agg_join), { upload_id: inp.upload_id, drop_duplicates: inp.agg_drop_duplicates, filters: inp.agg_filters ?? [], group_by: inp.agg_min_group_size > 1 ? inp.agg_group_by : "", time_bucket: "none", date_column: "",
         measure: inp.agg_measure === "count" ? "count" : "sum", measure_column: inp.agg_measure === "count" ? "" : inp.agg_column, top_n: 15, min_group_size: inp.agg_min_group_size });
       value = inp.agg_measure === "average" ? (r.rowsUsed ? r.total / r.rowsUsed : null) : r.total;
       source = `${t.file}: ${inp.agg_measure} of ${inp.agg_measure === "count" ? "rows" : inp.agg_column}${inp.agg_min_group_size > 1 ? ` (only ${inp.agg_group_by} values shared by ${inp.agg_min_group_size}+ rows)` : ""}${inp.agg_filters?.length ? ` where ${inp.agg_filters.map((f) => `${f.op === "is_filled" ? `${f.column} is filled in` : `${f.column} ${f.op.replace("_", " ")} ${f.value}`}`).join(" and ")}` : ""}`;

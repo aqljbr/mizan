@@ -25,7 +25,7 @@ type Num = { value: string; kind: "observed" | "assumed" | "synthetic" | "public
 type DraftFinding = { claim: string; confidence: "strong" | "moderate" | "weak" | "untested"; why: string; to_strengthen: string; numbers: Num[] };
 // go = act now; go_conditional = act now with named safeguards; test_first = run a defined test before committing;
 // insufficient = the question can't be answered at all yet. Missing internal data alone is not "insufficient".
-type Verdict = "go" | "go_conditional" | "test_first" | "insufficient";
+type Verdict = "go" | "go_conditional" | "test_first" | "no_go" | "insufficient";
 type Draft = {
   decision_type: Verdict;
   direct_answer: string;
@@ -68,7 +68,7 @@ const REACTION_SCHEMA = S.obj({
 });
 const NUM = S.obj({ value: S.str("The number with its unit, e.g. 'AED 12,400' or '41%'. Never an id or code"), kind: S.enum(["observed", "public", "assumed", "synthetic"]), ref: S.str("E12 or X3 for observed; the evidence id carrying the research for public; empty otherwise"), detail: S.str("Where exactly: file/column/period, or the assumption and its range") });
 const DRAFT_SCHEMA = S.obj({
-  decision_type: S.enum(["go", "go_conditional", "test_first", "insufficient"]),
+  decision_type: S.enum(["go", "go_conditional", "test_first", "no_go", "insufficient"]),
   direct_answer: S.str("ONE sentence that answers the exact question asked (yes/no/how much/which), with likely, possible or unlikely when it is a forecast"),
   key_points: S.arr(S.str(), "Exactly 3 short bullets (max 22 words each): the main reason, the main risk, what would change your mind"),
   answer: S.str("A fuller paragraph for readers who want detail (max 120 words). Plain words"),
@@ -124,7 +124,8 @@ You are in the DECIDE stage. Write the recommendation from the evidence and the 
 - Cover what each key stakeholder gains or risks (the people served, the client, delivery partners, government), including what would make partners willing to do it.
 - "public" numbers come from PUBLIC RESEARCH attached to a missing item: cite that item's E-id, and name the source in "detail". Public benchmarks are weaker than client data: say so in confidence. Prefer exhibits: they are computed exactly. Say where in "detail".
 - Verdict: "go" = act now as recommended; "go_conditional" = act now with named safeguards; "test_first" = run a defined, cheap test before
-  committing (only when the decision is risky AND such a test exists); "insufficient" = ONLY when the question cannot be answered at all.
+  committing (only when the decision is risky AND such a test exists); "no_go" = do NOT do what was asked, as proposed (say what would
+  make it a yes); "insufficient" = ONLY when the question cannot be answered at all. If direct_answer says no, the verdict is "no_go".
   If your FIRST recommended step is a pilot or test whose result decides whether to go ahead, the verdict is "test_first", not "go_conditional".
   "go_conditional" means you are recommending the action itself now, with safeguards.
   Missing internal data is NOT by itself a reason for "insufficient" or "test_first": give your best answer from the available evidence,

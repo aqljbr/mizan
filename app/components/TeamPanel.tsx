@@ -38,6 +38,7 @@ export function TeamPanel({ engagementId, actors, messages, exhibits, canAnalyse
   const [pending, setPending] = useState<string | null>(null);
   const [err, setErr] = useState("");
   const [busy, start] = useTransition();
+  const [proposal, setProposal] = useState<string | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
 
   const isStaff = selected === "analyst" || selected === "researcher" || selected === "consultant";
@@ -53,7 +54,8 @@ export function TeamPanel({ engagementId, actors, messages, exhibits, canAnalyse
     start(async () => {
       if (selected === "consultant") {
         const a = await askConsultant(engagementId, q);
-        if (a.openChange) { window.dispatchEvent(new CustomEvent("ac:tab", { detail: "overview" })); window.dispatchEvent(new CustomEvent("ac:open-change", { detail: a.proposed ?? "" })); }
+        // Stay in the chat; offer the question change as a choice rather than jumping away.
+        setProposal(a.openChange ? a.proposed ?? "" : null);
         setPending(null); router.refresh(); return;
       }
       const r = selected === "analyst" ? await chatAnalyst(engagementId, q) : selected === "researcher" ? await chatResearcher(engagementId, q) : await chatPersona(engagementId, selected, q);
@@ -131,6 +133,14 @@ export function TeamPanel({ engagementId, actors, messages, exhibits, canAnalyse
           </div>
         ))}
         {pending && <><div className="msg me" dir="auto">{pending}</div><div className="msg ai muted">{selected === "analyst" ? (ar ? "يحسب… (حتى 30 ثانية)" : "Computing… (up to 30 s)") : selected === "researcher" ? (ar ? "يبحث في الويب… (حتى 30 ثانية)" : "Searching the web… (up to 30 s)") : "…"}</div></>}
+        {proposal !== null && selected === "consultant" && !pending && (
+          <p className="small" dir="auto">
+            {ar ? "يبدو هذا سؤالًا مختلفًا عن سؤال المهمة. " : "This sounds like a different question from the engagement's. "}
+            <button className="link-btn" onClick={() => { window.dispatchEvent(new CustomEvent("ac:tab", { detail: "overview" })); window.dispatchEvent(new CustomEvent("ac:open-change", { detail: proposal })); setProposal(null); }}>
+              {ar ? "غيّر سؤال المهمة" : "Change the engagement's question"}
+            </button>
+          </p>
+        )}
         {err && <p className="err" role="alert">{err}</p>}
       </div>
       <div style={{ borderTop: "1px solid var(--line)" }}>

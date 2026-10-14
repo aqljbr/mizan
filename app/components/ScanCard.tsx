@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import type { Lang } from "@/lib/i18n";
 
-type Finding = { kind: string; title: string; detail: string; column?: string };
+type Finding = { kind: string; title: string; detail: string; column?: string; rows?: number[] };
 
 // "What stands out": the analyst's code scan of every uploaded table, before anyone asked.
 export function ScanCard({ engagementId, lang }: { engagementId: string; lang: Lang }) {
@@ -30,10 +30,13 @@ export function ScanCard({ engagementId, lang }: { engagementId: string; lang: L
             <ul className="scan-list">
               {f.findings.map((x, i) => (
                 <li key={i}>
-                  <b dir="auto">{x.title}</b>
+                  <b dir="auto" className={x.kind === "cleaning" ? "muted" : ""}>{x.kind === "cleaning" ? "ⓘ " : ""}{x.title}</b>
                   <span className="small muted" dir="auto"> {x.detail}</span>
                   {x.kind === "repeated_identifier" && x.column && (
                     <> <a className="link-btn" href={`/e/${engagementId}/scan/${f.upload}/${encodeURIComponent(x.column)}`} download>{ar ? "نزّل السجلات (CSV)" : "Download these records (CSV)"}</a></>
+                  )}
+                  {x.rows && x.rows.length > 0 && (
+                    <> <a className="link-btn" href={`/e/${engagementId}/scan/${f.upload}/__f${i}`} download>{ar ? `نزّل ${x.rows.length} سجلًا (CSV)` : `Download the ${x.rows.length} records (CSV)`}</a></>
                   )}
                 </li>
               ))}

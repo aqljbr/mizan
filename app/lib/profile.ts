@@ -38,19 +38,60 @@ function splitLine(line: string, sep: string): string[] {
   return out.map((s) => s.trim());
 }
 
-export function parseCsv(text: string): { header: string[]; rows: Cell[][] } {
+export function parseCsv(text: string): { header: string[]; rows: Cell[][]; notes: string[] } {
   const lines = text.replace(/^﻿/, "").split(/\r?\n/).filter((l) => l.trim() !== "");
-  if (!lines.length) return { header: [], rows: [] };
-  const sep = [",", ";", "\t"].sort((a, b) => lines[0].split(b).length - lines[0].split(a).length)[0];
-  return { header: splitLine(lines[0], sep), rows: lines.slice(1).map((l) => splitLine(l, sep)) };
+  if (!lines.length) return { header: [], rows: [], notes: [] };
+  // The separator is the one that splits most lines the same way (the first line may be a title).
+  const sample = lines.slice(0, 20);
+  const sep = [",", ";", "\t"].sort((a, b) => Math.max(...sample.map((l) => l.split(b).length)) - Math.max(...sample.map((l) => l.split(a).length)))[0];
+  return tidy(lines.map((l) => splitLine(l, sep).map((v): Cell => (v === "" ? null : v))));
 }
 
-export async function parseXlsx(buf: Buffer): Promise<{ header: string[]; rows: Cell[][]; sheet: string }> {
+const TOTAL = /^(grand\s+)?(sub)?total(s)?\b|^الإجمالي|^المجموع|^الاجمالي|^إجمالي/i;
+const filled = (r: Cell[]) => r.filter((v) => v !== null && v !== undefined && String(v).trim() !== "").length;
+
+/**
+ * Real exports are messy. Before anything is counted: find the real header row (skip report titles above it), drop totals rows,
+ * and read dd/mm vs mm/dd dates the way the column itself shows (a value like 13/02 or 02/13 settles it). Every change is noted.
+ */
+export function tidy(all: Cell[][]): { header: string[]; rows: Cell[][]; notes: string[] } {
+  const notes: string[] = [];
+  if (!all.length) return { header: [], rows: [], notes };
+  const width = Math.max(...all.slice(0, 60).map(filled));
+  const isText = (v: Cell) => typeof v === "string" && v.trim() !== "" && asNumber(v) === null && asDate(v) === null;
+  let h = all.slice(0, 15).findIndex((r) => filled(r) >= Math.max(2, Math.ceil(width * 0.6)) && r.filter(isText).length >= filled(r) * 0.6);
+  if (h < 0) h = 0;
+  if (h > 0) notes.push(`Skipped ${h} title line${h > 1 ? "s" : ""} above the column headers ("${String(all[0].find((v) => v) ?? "").slice(0, 60)}").`);
+  const header = all[h].map((v, i) => (v == null || String(v).trim() === "" ? `Column ${i + 1}` : String(v).trim()));
+  let rows = all.slice(h + 1).map((r) => header.map((_, i) => (r[i] === undefined ? null : r[i])));
+  const before = rows.length;
+  rows = rows.filter((r) => !(r.some((v) => typeof v === "string" && TOTAL.test(v.trim())) && filled(r) <= Math.ceil(header.length / 2)));
+  if (rows.length < before) notes.push(`Removed ${before - rows.length} totals row${before - rows.length > 1 ? "s" : ""} so they are not counted twice.`);
+  // Dates written as a/b/yyyy: decide the order per column.
+  header.forEach((name, i) => {
+    const vals = rows.map((r) => r[i]).filter((v): v is string => typeof v === "string" && /^\d{1,2}[-/.]\d{1,2}[-/.]\d{4}/.test(v.trim()));
+    if (vals.length < rows.filter((r) => r[i] !== null).length * 0.8 || !vals.length) return;
+    const parts = vals.map((v) => v.trim().match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/)!);
+    const firstBig = parts.some((m) => +m[1] > 12), secondBig = parts.some((m) => +m[2] > 12);
+    const monthFirst = secondBig && !firstBig;
+    if (!firstBig && !secondBig) notes.push(`Dates in "${name}" could be day/month or month/day; read as day/month (UAE style). Check if that is wrong.`);
+    else notes.push(`Dates in "${name}" are written ${monthFirst ? "month/day/year (US style)" : "day/month/year"}; read that way.`);
+    rows.forEach((r) => {
+      const v = r[i]; if (typeof v !== "string") return;
+      const m = v.trim().match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/); if (!m) return;
+      const [d, mo] = monthFirst ? [+m[2], +m[1]] : [+m[1], +m[2]];
+      r[i] = `${m[3]}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    });
+  });
+  return { header, rows, notes };
+}
+
+export async function parseXlsx(buf: Buffer): Promise<{ header: string[]; rows: Cell[][]; sheet: string; notes: string[] }> {
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(buf as unknown as ArrayBuffer);
   // Use the sheet with the most rows.
   const ws = [...wb.worksheets].sort((a, b) => b.actualRowCount - a.actualRowCount)[0];
-  if (!ws) return { header: [], rows: [], sheet: "" };
+  if (!ws) return { header: [], rows: [], sheet: "", notes: [] };
   const all: Cell[][] = [];
   ws.eachRow({ includeEmpty: false }, (row) => {
     const vals = (row.values as unknown[]).slice(1).map((v): Cell => {
@@ -64,8 +105,7 @@ export async function parseXlsx(buf: Buffer): Promise<{ header: string[]; rows: 
     });
     all.push(vals);
   });
-  const header = (all[0] ?? []).map((h, i) => (h == null || h === "" ? `Column ${i + 1}` : String(h)));
-  return { header, rows: all.slice(1), sheet: ws.name };
+  return { ...tidy(all), sheet: ws.name };
 }
 
 function asNumber(v: Cell): number | null {

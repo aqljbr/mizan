@@ -58,13 +58,13 @@ export function nameCodes(text: string, items: { id: number; name: string }[], e
 }
 
 /** How the last analysis ended: recommend / conditional / abstain (from the record). */
-export type Verdict = "go" | "go_conditional" | "test_first" | "insufficient";
+export type Verdict = "go" | "go_conditional" | "test_first" | "no_go" | "insufficient";
 export function decisionType(id: string): Verdict {
   const r = db().prepare("SELECT data FROM events WHERE engagement_id = ? AND type = 'decision.final' ORDER BY seq DESC LIMIT 1").get(id) as { data: string } | undefined;
   const d = r ? (JSON.parse(r.data).decision_type as string | undefined) : undefined;
   // Older engagements used recommend / conditional / abstain.
   const map: Record<string, Verdict> = { recommend: "go", conditional: "go_conditional", abstain: "insufficient" };
-  return (d && (map[d] ?? (["go", "go_conditional", "test_first", "insufficient"].includes(d) ? d : null))) as Verdict ?? "go";
+  return (d && (map[d] ?? (["go", "go_conditional", "test_first", "no_go", "insufficient"].includes(d) ? d : null))) as Verdict ?? "go";
 }
 
 export const visibleItems = (c: CaseFile) => c.items.filter((i) => i.origin !== "briefing" && i.added_in_version <= c.e.question_version);

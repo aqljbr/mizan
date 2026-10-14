@@ -11,7 +11,7 @@ import { getEngagement, nextStep, visibleItems, nameCodes, fmtDay, type CaseFile
 import { documentText } from "@/lib/docs";
 import { runAnalyst } from "@/lib/analyst/analyst";
 import { loadTable } from "@/lib/analyst/query";
-import { scanTable } from "@/lib/analyst/scan";
+import { scanTable, scanLinks, linkedGroupColumn } from "@/lib/analyst/scan";
 import { saveArtifact } from "@/lib/engine/frame";
 import crypto from "node:crypto";
 import { parseCsv, parseXlsx, profileTable, describeProfile } from "@/lib/profile";
@@ -314,7 +314,7 @@ export async function uploadData(itemId: number, form: FormData, opts: { skipFit
   const stored = `${Date.now()}-${file.name.replace(/[^\w.\-]+/g, "_").slice(-80)}`;
   fs.writeFileSync(path.join(dir, stored), buf);
 
-  let table: { header: string[]; rows: (string | number | Date | null)[][]; sheet?: string };
+  let table: { header: string[]; rows: (string | number | Date | null)[][]; sheet?: string; notes?: string[] };
   try {
     if (/\.(csv|txt|tsv)$/i.test(file.name)) table = parseCsv(buf.toString("utf8"));
     else if (/\.xlsx$/i.test(file.name)) table = await parseXlsx(buf);
@@ -323,8 +323,12 @@ export async function uploadData(itemId: number, form: FormData, opts: { skipFit
     return { error: `We couldn't read “${file.name}”. Is it a normal spreadsheet export?` };
   }
   if (!table.rows.length) return { error: `“${file.name}” looks empty. Please check the export and try again.` };
+  // Same derived column the analyst's table loader adds, so the profile (what the analyst is told) lists it too.
+  const lg = linkedGroupColumn({ header: table.header, rows: table.rows, file: file.name, uploadId: 0 });
+  if (lg) table = { ...table, header: [...table.header, "linked_group"], rows: table.rows.map((r, i) => [...r, lg[i] || null]) };
   const profile = profileTable(table.header, table.rows, table.sheet);
-  const summary = describeProfile(profile, file.name, (db().prepare("SELECT lang FROM engagements WHERE id = ?").get(engagement_id) as { lang: "en" | "ar" }).lang);
+  const summary = describeProfile(profile, file.name, (db().prepare("SELECT lang FROM engagements WHERE id = ?").get(engagement_id) as { lang: "en" | "ar" }).lang)
+    + (table.notes?.length ? `\nHow the file was read: ${table.notes.join(" ")}` : "");
   const sha = crypto.createHash("sha256").update(buf).digest("hex");
   const itemRow = db().prepare("SELECT name, why FROM data_items WHERE id = ?").get(itemId) as { name: string; why: string };
   const engLang = (db().prepare("SELECT lang FROM engagements WHERE id = ?").get(engagement_id) as { lang: string }).lang;
@@ -346,7 +350,10 @@ export async function uploadData(itemId: number, form: FormData, opts: { skipFit
     const up = conn.prepare("SELECT id FROM uploads WHERE item_id = ? ORDER BY id DESC LIMIT 1").get(itemId) as { id: number };
     const tb = await loadTable(up.id);
     if (tb) {
-      const found = scanTable(tb);
+      const found = [...(table.notes ?? []).map((x) => ({ kind: "cleaning", title: x, detail: "" })), ...scanTable(tb)];
+      // Other tables in this engagement that share an identifier with this one: what the link shows.
+      const others = conn.prepare("SELECT id FROM uploads WHERE engagement_id = ? AND id != ? GROUP BY sha256").all(engagement_id, up.id) as { id: number }[];
+      for (const o of others) { const ot = await loadTable(o.id); if (ot && ot.file !== tb.file) found.push(...scanLinks(tb, ot)); }
       saveArtifact(engagement_id, null, "scan", String(up.id), { file: file.name, item_id: itemId, findings: found });
       appendEvent(conn, engagement_id, "analyst", "analyst.scanned", { file: file.name, findings: found.map((f) => f.title) });
     }
@@ -384,7 +391,7 @@ export async function askConsultant(id: string, question: string) {
   let a: { text: string; openChange?: boolean; proposed?: string };
   try {
     const r = await answerQuestion(id, q);
-    a = { text: r.answer.replace(/\s*\|?\s*\b(question_changed|proposed_question|needs_calculation)\s*[=:][\s\S]*$/, "").trim(), openChange: r.question_changed, proposed: r.proposed_question || undefined };
+    a = { text: r.answer.split("\n").filter((l) => !/^\s*\|?\s*(question_changed|proposed_question|needs_calculation)\s*[=:]/.test(l)).join("\n").trim(), openChange: r.question_changed, proposed: r.proposed_question || undefined };
     // Questions that need arithmetic go to the analyst's calculator, so the number is computed, not guessed.
     if (r.needs_calculation) {
       const x = await runAnalyst(id, { question: q, count: 1, origin: "chat" });

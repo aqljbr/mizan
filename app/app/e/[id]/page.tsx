@@ -32,6 +32,7 @@ const VERDICT: Record<string, [string, string]> = {
   go: ["Go", "نفّذ"],
   go_conditional: ["Go, with conditions", "نفّذ بشروط"],
   test_first: ["Test first", "اختبر أولًا"],
+  no_go: ["Don't, as proposed", "لا تنفّذ بالشكل المقترح"],
   insufficient: ["Not enough evidence", "لا تكفي الأدلة"],
 };
 const CONF_LEVEL: Record<string, number> = { strong: 4, moderate: 3, weak: 2, untested: 1 };
@@ -141,7 +142,7 @@ export default async function CaseFilePage({ params }: { params: Promise<{ id: s
               <p className="collapsed-note">{T("case.recEmpty")}</p>
             ) : (
               <>
-                <div className={`verdict ${dtype === "go" || dtype === "go_conditional" ? "go" : dtype === "insufficient" ? "stop" : ""}`} style={{ marginBlockEnd: 14 }}>
+                <div className={`verdict ${dtype === "go" || dtype === "go_conditional" ? "go" : dtype === "insufficient" || dtype === "no_go" ? "stop" : ""}`} style={{ marginBlockEnd: 14 }}>
                   <span>{lang === "ar" ? "الحكم" : "Verdict"}</span>
                   <b>{VERDICT[dtype][lang === "ar" ? 1 : 0]}</b>
                   <span>· {lang === "ar" ? "مستوى الأدلة" : "evidence level"} {e.validity ?? "–"}</span>
