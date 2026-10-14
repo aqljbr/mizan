@@ -8,6 +8,7 @@ import { BriefingSection } from "@/components/BriefingSection";
 import { ScrollTop } from "@/components/ScrollTop";
 import { ScanCard } from "@/components/ScanCard";
 import { PrivacyCard } from "@/components/PrivacyCard";
+import { FirstLook } from "@/components/FirstLook";
 import { ExhibitChart, type ExhibitData } from "@/components/ExhibitChart";
 import { listExhibits, headlineNumbers } from "@/lib/analyst/analyst";
 import { history } from "@/lib/engine/agents";
@@ -249,6 +250,7 @@ export default async function CaseFilePage({ params }: { params: Promise<{ id: s
           </p>
 </>,
             overview: <>
+          {!final && <FirstLook engagementId={e.id} lang={lang} />}
           <section className="sheet" aria-labelledby="progress">
             <div className="sec-h">
               <h2 id="progress" tabIndex={-1}>{T("case.progress")}</h2>

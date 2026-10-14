@@ -6,12 +6,14 @@ import { createEngagement } from "./actions";
 import { db } from "@/lib/db";
 import { FilePick } from "@/components/FilePick";
 import { STAGE_KEYS } from "@/lib/model";
+import { STAGE } from "@/lib/stage";
 
 export const dynamic = "force-dynamic";
 
 
-export default async function Home() {
+export default async function Home({ searchParams }: { searchParams: Promise<{ stage?: string }> }) {
   const lang = await getLang();
+  const stage = process.env.AICONSULT_DEMO === "1" && (await searchParams).stage === "1" ? STAGE[lang] : null;
   const T = (k: Parameters<typeof t>[1], v?: Record<string, string | number>) => t(lang, k, v);
   const list = listEngagements().map((e) => ({ e, n: nextStep(getEngagement(e.id)!, lang) }));
   const one = (sql: string) => (db().prepare(sql).get() as { n: number }).n;
@@ -48,14 +50,15 @@ export default async function Home() {
           <p className="small muted" style={{ marginBlockEnd: 12 }}>{T("home.newP")}</p>
           <form action={createEngagement} className="stack" style={{ gap: 10 }}>
             <label htmlFor="client" className="small"><b>{lang === "ar" ? "المؤسسة" : "Organisation"}</b></label>
-            <input id="client" name="client" className="note" style={{ minHeight: 0 }} required placeholder={T("home.companyPh")} />
+            <input id="client" name="client" className="note" style={{ minHeight: 0 }} required placeholder={T("home.companyPh")} defaultValue={stage?.client} />
             <label htmlFor="question" className="small"><b>{T("home.question")}</b></label>
-            <textarea id="question" name="question" className="note" style={{ minHeight: 150 }} required minLength={8} placeholder={T("home.questionPh")} />
+            <textarea id="question" name="question" className="note" style={{ minHeight: 150 }} required minLength={8} placeholder={T("home.questionPh")} defaultValue={stage?.question} />
             <label htmlFor="role" className="small"><b>{lang === "ar" ? "من أنت؟ (اختياري)" : "Who are you? (optional)"}</b></label>
-            <input id="role" name="role" className="note" style={{ minHeight: 0 }} placeholder={lang === "ar" ? "مثال: مالك الشركة، ممول، جهة حكومية" : "e.g. business owner, funder, government agency"} />
+            <input id="role" name="role" className="note" style={{ minHeight: 0 }} placeholder={lang === "ar" ? "مثال: مالك الشركة، ممول، جهة حكومية" : "e.g. business owner, funder, government agency"} defaultValue={stage?.role} />
             <label htmlFor="briefing" className="small"><b>{lang === "ar" ? "ما تعرفه مسبقًا (اختياري)" : "What you already know (optional)"}</b></label>
-            <textarea id="briefing" name="briefing" className="note" style={{ minHeight: 110 }} placeholder={lang === "ar" ? "حقائق وأرقام وسياق، ومن يملك أي بيانات" : "Facts, numbers, context, and who holds which data"} />
+            <textarea id="briefing" name="briefing" className="note" style={{ minHeight: 110 }} placeholder={lang === "ar" ? "حقائق وأرقام وسياق، ومن يملك أي بيانات" : "Facts, numbers, context, and who holds which data"} defaultValue={stage?.briefing} />
             <label htmlFor="files" className="small"><b>{lang === "ar" ? "ملفات الخلفية (اختياري)" : "Background files (optional)"}</b> <span className="muted">PDF, Word, Excel, CSV</span></label>
+            {stage && <p className="small"><input type="hidden" name="sample" value={STAGE.sample} />📎 <b>{STAGE.sample}</b> <span className="muted">{lang === "ar" ? "(مرفق تلقائيًا للعرض)" : "(attached for the demo)"}</span></p>}
             <FilePick name="files" label={lang === "ar" ? "اختر ملفات" : "Choose files"} none={lang === "ar" ? "لا ملفات (حتى 15 ميغابايت لكل ملف)" : "No files yet (up to 15 MB each)"} />
             <details>
               <summary>{lang === "ar" ? "اختبار قرار سابق: تاريخ القرار" : "Testing a past decision? Set a decision date"}</summary>

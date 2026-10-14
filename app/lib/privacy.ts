@@ -13,7 +13,7 @@ type Kind = "NAME" | "PHONE" | "EMAIL" | "ID" | "ACCOUNT" | "ADDRESS" | "USER";
 const COLUMN_KINDS: [RegExp, Kind][] = [
   [/e-?mail|بريد/i, "EMAIL"],
   [/phone|mobile|tel\b|fax|هاتف|جوال/i, "PHONE"],
-  [/ssn|national.?id|emirates.?id|passport|id.?number|\btrn\b|tax.?id|licen[cs]e.?(no|number)|هوية|جواز/i, "ID"],
+  [/ssn|national.?id|emirates.?id|passport|id.?number|\btrn\b|tax.?id|licen[cs]e.?(no|number)|device|imei|\bip\b|ip.?address|هوية|جواز|جهاز/i, "ID"],
   [/account|iban|card.?(no|number)|\bcard\b|حساب|آيبان/i, "ACCOUNT"],
   [/address|street|عنوان/i, "ADDRESS"],
   [/author|user.?name|handle|login/i, "USER"],

@@ -11,6 +11,7 @@ import { getEngagement, nextStep, visibleItems, nameCodes, fmtDay, type CaseFile
 import { documentText } from "@/lib/docs";
 import { runAnalyst } from "@/lib/analyst/analyst";
 import { loadTable } from "@/lib/analyst/query";
+import { STAGE_FILES } from "@/lib/stage";
 import { scanTable, scanLinks, linkedGroupColumn } from "@/lib/analyst/scan";
 import { saveArtifact } from "@/lib/engine/frame";
 import crypto from "node:crypto";
@@ -48,6 +49,12 @@ export async function createEngagement(form: FormData) {
   const asOf = /^\d{4}-\d{2}-\d{2}$/.test(asOfRaw) ? asOfRaw : null;
   const note = String(form.get("briefing") ?? "").trim().slice(0, 20000);
   const files = form.getAll("files").filter((f): f is File => f instanceof File && f.size > 0).slice(0, 8);
+  // Stage demo (demo mode only): attach a named sample file from the app's own test data, never an arbitrary path.
+  const sample = String(form.get("sample") ?? "");
+  if (process.env.AICONSULT_DEMO === "1" && STAGE_FILES.has(sample)) {
+    const buf = fs.readFileSync(path.join(process.cwd(), "benchmarks", "data", sample));
+    files.unshift(new File([buf], sample, { type: "text/csv" }));
+  }
   if (!client || question.length < 8) return;
   const conn = db();
   const last = conn.prepare("SELECT MAX(CAST(id AS INTEGER)) AS n FROM engagements").get() as { n: number | null };

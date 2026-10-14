@@ -30,6 +30,7 @@ export function NavLinks({ live, demo }: { live: string[]; demo: boolean }) {
           <details className="demo-menu demo-tool">
             <summary className="pill-btn">{lang === "ar" ? "العرض" : "Demo"}</summary>
             <div className="demo-pop">
+              <Link className="ghost" href="/?stage=1">{lang === "ar" ? "عرض المسرح (لذيذ)" : "Stage demo (Lazeez)"}</Link>
               <button className="ghost" disabled={busy} onClick={() => start(async () => { await saveDemoSnapshot(); setSaved(true); setTimeout(() => setSaved(false), 2500); })}>
                 {saved ? t("nav.snapshotDone") : t("nav.snapshot")}
               </button>

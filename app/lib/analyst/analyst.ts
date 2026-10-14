@@ -150,6 +150,8 @@ DRIVERS ("what drives X", "why do customers leave"): use measure "rate" (e.g. ch
 matters inside one level of the strongest factor (filters), because a factor can look important only because it travels with another one.
 If the code scan reports outcome drivers, chart the outcome rate by the strongest driver, and chart the rate by the factor the client blames
 inside the low-risk level of that driver (the scan's "holding … at its low-risk level" check) so the client sees whether their belief holds.
+If the scan reports linked groups or hot spots, size them: the money they took (sum the money column, filter linked_group is_filled or the
+hot-spot value) and its share of the total, in a calc, so the recommendation can say how much is at stake.
 If the code scan reports a linked group or file link, list those records (the scan's CSV holds them) rather than re-deriving them. Group filters (min_group_size) find repeated identifiers.`,
     user: `${text}\n\n${scanFacts(engagementId)}\n\nTABLES YOU CAN USE: ${JSON.stringify(brief.tables)}\nROWS OF SMALL TABLES: ${JSON.stringify(rows)}\nCLIENT NOTES: ${JSON.stringify(brief.notes)}${opts.question ? `\n\nTHE CLIENT ASKS YOU: ${opts.question}${wantsList ? "\nThe client wants the records themselves: use kind \"list\"." : ""}` : ""}`,
     schema: S.obj({ exhibits: S.arr(S.obj({ purpose: S.str("Which question this answers"), scenario: S.str("'base case' unless you changed an assumption, e.g. 'at a 75% gross margin'"), kind: S.enum(["chart", "calc", "list"]), chart: S.enum(["bar", "line", "stacked_column"]), query: QUERY, calc: CALC, list: LIST })) }),
@@ -224,6 +226,7 @@ written with thousands separators in the data's own currency ($328,613; €12.4 
 Say only what the data shows: no causes, no forecasts, no "enabling" or "because" unless the data itself shows it. For a calc, the title states the final result.
 A title is a statement of the conclusion, never an instruction ("Show…", "Calculate…"). If the scenario is not the base case, name it in the title.
 Subtitle: what is shown and the unit. When a result is grouped_by a column, name that column in the title (never "series").
+A list's rows_listed counts ROWS (e.g. orders), not people or accounts; say "orders"/"rows" unless the rows are one per account.
 Rates, averages and shares are never added together (a "total" of churn rates means nothing). ${langRule(lang)}`,
     user: JSON.stringify(payload),
     schema: S.obj({ exhibits: S.arr(S.obj({ title: S.str(), subtitle: S.str() })) }),

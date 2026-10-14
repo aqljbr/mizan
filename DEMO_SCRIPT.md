@@ -1,41 +1,30 @@
-# Stage demo script (about 5 minutes)
+# Stage demo script (3 minutes): Lazeez voucher and refund leaks
 
-**One line for the judges:** *"Mizan is an AI consulting team. A data analyst computes from your files, a researcher fills the gaps from public sources, a simulated world of the people who decide the outcome tests the options, and an independent checker tries to break the recommendation. Every step is kept in a tamper-proof record."*
+**One line for the judges:** *"Mizan is an AI consulting team you can audit. Its data analyst finds what is hidden in your files in seconds, by code,
+the team argues with itself before you see an answer, and your customers' personal data never reaches the AI."*
 
 ## Before you go on stage
-1. Start the app: `cd ~/aiconsult/app && npm run build && npx next start -p 3100`.
-2. Run one full engagement in advance (the Palm Toys question below, using the two sample files from the home page). When it's done, press **Save as demo start** in the top bar. **Reset demo** now returns to this exact state.
-3. Have the two sample files on the desktop: `palm-toys-orders-12m.csv` and `palm-toys-ad-spend-12m.xlsx`. They download from the home page.
-4. Check the internet connection. The AI needs it. If the connection drops, use the finished engagement and the **Replay** (step 6).
+1. Start the app in demo mode (`AICONSULT_DEMO=1` in `app/.env.local`): `cd ~/aiconsult/app && npm run build && npx next start -p 3100`.
+2. Run the flagship once in advance: **Demo → Stage demo (Lazeez)**, press **Start**, then **Yes, this is right**. On the Data tab, choose the
+   attached file for the order-data item, press "We don't have it" for the rest, and let the analysis finish (about 4–6 minutes).
+   Then **Demo → Save as demo start**. **Reset** now returns to this exact state: one finished Lazeez case.
+3. Open two tabs: the finished case (Answer tab) and the home page.
+4. Internet is needed (the AI is hosted). The scan in step 2 below needs no AI.
 
 ## The script
 
 | Time | Do | Say |
 |---|---|---|
-| 0:00 | Home page. Type company **Palm Toys** and the question *"Our online sales dropped since summer. We think ride-on toys are too expensive. Should we cut ride-on prices by 15% before winter?"* Press **Start**. | "A business owner arrives with a problem and a solution already in mind: cut prices." |
-| 0:20 | The **What the consultant understood** card fills in (about 20 s). Point at **Your idea** and **Other possible causes**. | "First, it refuses to take the owner's idea as the diagnosis. Price is one hypothesis. Seasonality, stock-outs, traffic and competitors are others." |
-| 0:45 | Press **Yes, this is right**. Show the evidence list and open **Why the consultant needs it and how to get it**. | "It asks for the smallest set of data that could change the decision, and says how to export it." |
-| 1:05 | Upload **orders CSV** into the first item. It says "We read 8,823 rows… dates…". Upload **ad spend Excel** into the second. If it says *"This may be the wrong file"*, point at that. Press **We don't have it** on the third. | "It reads the file immediately, and it checks that you uploaded the right thing. Data you don't have is allowed: it will be estimated and labelled as an assumption." |
-| 1:30 | The analysis starts by itself. The progress bar pulses and the **live view** fills in: the world, the pass test, and simulated people turning ✓ one by one. | "Now it builds a small world of the people whose reactions decide the outcome, and **writes down its pass test before seeing any result**, with a fingerprint. Each simulated person runs alone and never sees the others." |
-| 2:30 | **"The independent checker disputes the draft"** appears in red. | "This is the important part. A second AI, which never saw the first one's reasoning, attacks the draft. Here it disagreed. The consultant has to revise." |
-| 3:30 | The recommendation appears. Read the first line of the answer. Point at a number tag such as *AED 6,082,817 · orders CSV*. | "The answer is *not* the owner's idea. Every number shows where it came from: your file, an assumption, or the simulation. We checked these against the raw file: they are exact." |
-| 3:50 | Scroll to **How the consultant got here**: the table of people × options, and the checker's notes. | "You can see exactly why: who liked which option, and what the checker objected to." |
-| 4:10 | Press the **العربية** top-bar button. Then open **PDF report · العربية**. | "The whole product works in Arabic. Engagements can be run in Arabic, and any report downloads in Arabic or English." |
-| 4:30 | Open **Full record**. Point at **Record intact** and the AI calls list. | "Every step, file and AI call is recorded with a server time and a fingerprint chain. If anyone changes history, this check fails. That is what makes the advice auditable." |
-| 4:50 | Close. | "An AI consultant you can audit. Built for UAE businesses, in Arabic and English." |
-
-## Extra moments that land well
-- **Researcher:** press "We don't have it" on a must-have item and watch "Researching public sources…". The card fills with UAE prices and benchmarks, with links.
-- **Exhibits:** scroll to "What the data says". Each chart has a conclusion title and a source line with the row count; say "every number computed from your file".
-- **The world:** hover a person to isolate their view, drag them, click one, ask "What would change your mind?", then "Correct this person". When the banner appears, press "Update the recommendation".
-- **Analyst chat:** ask "Show revenue by channel per month" and a new exhibit appears in the chat.
+| 0:00 | Home tab. **Demo → Stage demo (Lazeez)**. The form fills: Dubai food-delivery app, 26,000 orders. Read the question aloud. | "Finance wants to cut the new-user voucher budget by 30%. That's the owner's idea. Is it right?" |
+| 0:15 | Press **Start**. In about 6 seconds, **The analyst's first look** appears. | "Before anyone asks, the analyst has scanned every order, by code, with no AI: **570 accounts in 3 linked clusters took AED 22,800 in welcome vouchers**. Each account shares a phone, a device, a card or an address with the next one, so no single value looks suspicious. And **one rider, R-217, refunds 44% of his orders, 18.5% of all refund money**." |
+| 0:50 | Switch to the finished case tab (**Answer**). Read the verdict and headline. | "The answer: **don't** cut across the board. Genuine new users come back; the farm accounts order once. Block the linked accounts and stop the refund ring." |
+| 1:10 | Point at the number strip and one exhibit's source line. | "Every number is computed from the file, not written by the AI. Click any exhibit to see the rows behind it." |
+| 1:25 | **Simulated world** tab. Hover a person. Click **Abuse ring**, ask *"If we block accounts that share devices, what would you do?"* | "It simulates the people who decide the outcome, including the fraudster. Defensive answers only, no how-to." |
+| 1:50 | **Data** tab → **Privacy shield** → **See what the AI saw**. | "The AI never saw a single name, phone, card or address. 26,000 orders' worth of identifiers became placeholders, restored only on our machine. It can also run on a local UAE model, so nothing leaves the country." |
+| 2:15 | **Track record** in the top menu. Press **Re-run the checks now**. | "We don't ask you to trust it. 13 hidden answers planted in test files, found live in 3 seconds. Full engagements matched McKinsey's real result and every planted truth." |
+| 2:35 | Back to the case. **Slide deck** download, open it. | "And it hands you the deck: answer first, one exhibit per slide." |
+| 2:50 | Close. | "Mizan: an AI consulting team you can audit. Built in Dubai, in Arabic and English." |
 
 ## If something goes wrong
-- **The AI is slow or fails:** the card says "The consultant stopped because of a problem" with a **Try again** button. Or switch to the finished engagement and use **Replay the analysis** → **Play** / **Faster**.
-- **Internet is down:** use the finished engagement. The case file, report, PDF, record and replay all work offline. Only new AI calls need the internet.
-- **You want a clean start:** press **Reset demo**. It returns to the state saved with **Save as demo start**.
-
-## Numbers worth saying
-- About 12 AI calls and about 65,000 tokens per analysis. About 3 minutes from data to recommendation.
-- The checker disputed the first draft in every test run so far, and the answer changed each time. That's the method working, not a bug.
-- Evidence level today: **B** (simulated behaviour is plausible). Level C needs a back-test against real past months; that's next on the roadmap.
+- The AI is slow: everything from 0:50 on uses the finished case; only the first look (0:15) runs live, and it uses no AI.
+- No internet: skip Start; open the finished case and the track record (both work without new AI calls).

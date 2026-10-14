@@ -1,0 +1,41 @@
+{
+ "orders": 26376,
+ "customers": 8729,
+ "welcome_vouchers": {
+  "orders": 2082,
+  "aed": 83280.0
+ },
+ "farms": {
+  "F1": {
+   "accounts": 260,
+   "area": "International City",
+   "voucher_aed": 10400.0
+  },
+  "F2": {
+   "accounts": 190,
+   "area": "Al Nahda",
+   "voucher_aed": 7600.0
+  },
+  "F3": {
+   "accounts": 120,
+   "area": "Deira",
+   "voucher_aed": 4800.0
+  }
+ },
+ "farm_total": {
+  "accounts": 570,
+  "voucher_aed": 22800.0,
+  "share_of_welcome_spend_pct": 27.4
+ },
+ "rider_R217": {
+  "refunded_orders": 153,
+  "customers": 38,
+  "refund_aed": 13993.11,
+  "share_of_all_refund_aed_pct": 18.5
+ },
+ "repeat_rate_pct": {
+  "genuine_new_users": 89.7,
+  "farm_accounts": 3.9
+ },
+ "answer": "Do NOT cut the welcome voucher budget across the board: genuine new users repeat-order at a high rate. ~570 farm accounts in 3 chain-linked clusters (International City, Al Nahda, Deira) take a large share of welcome spend; block linked accounts (shared device/phone/card/address chains) and stop rider R-217's refund ring."
+}

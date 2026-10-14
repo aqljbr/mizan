@@ -4,7 +4,10 @@ import type { Table } from "./query";
 // Each finding is a plain sentence with its numbers, so the consultant and the analyst can build on it.
 
 type Cell = string | number | Date | null;
-export type ScanFinding = { kind: string; title: string; detail: string; column?: string; keys?: string[]; rows?: number[]; rows_file?: string; extra?: { name: string; values: string[] } };
+export type ScanFinding = { kind: string; title: string; detail: string; column?: string; keys?: string[]; rows?: number[]; rows_file?: string; extra?: { name: string; values: string[] };
+  card?: { big: string; label: string; facts: string[] } };
+/** Column names in plain words for headlines: "device_id" -> "device", "card_fingerprint" -> "card fingerprint". */
+export const human = (c: string) => c.replace(/[_-](id|ref|no|code)$/i, "").replace(/[_-]aed$/i, " AED").replace(/[_-]usd$/i, " USD").replace(/[_-]+/g, " ").trim();
 
 const num = (v: Cell): number | null => {
   if (typeof v === "number") return Number.isFinite(v) ? v : null;
@@ -51,7 +54,7 @@ function columnsOf(t: Table) {
 /** For each row, the chain-linked group it belongs to ("G1", "G2"…) or "" — so the analyst can filter, total and list these groups. */
 export function linkedGroupColumn(t: Table): string[] | null {
   if (t.rows.length < 20 || t.header.includes("linked_group")) return null;
-  const groups = linkedGroups(t, columnsOf(t));
+  const groups = linkedGroups(t, columnsOf(t)).filter((g) => g.kind === "linked_group");
   if (!groups.length) return null;
   const out = t.rows.map(() => "");
   groups.forEach((g, k) => g.rows!.forEach((ri) => { out[ri] = `G${k + 1}`; }));
@@ -102,6 +105,8 @@ export function scanTable(t: Table): ScanFinding[] {
     }
     out.push({
       kind: "repeated_identifier", column: c.name, keys: groups.slice(0, 15).map(([k]) => k),
+      card: { big: String(rows.length), label: `records share ${groups.length} repeated ${human(c.name)} value${groups.length > 1 ? "s" : ""}`, facts: [
+        `largest: ${groups[0][1].length} records on one ${human(c.name)}`, ...(amt !== null ? [`${human(amountCol!.name)} ${fmt(amt)}`] : []), ...(ageNote ? [ageNote.trim()] : [])] },
       title: `${groups.length} ${c.name} value${groups.length > 1 ? "s" : ""} repeat on 3+ records (${rows.length} records)`,
       detail: `Largest: ${groups.slice(0, 5).map(([k, rs]) => `${k} ×${rs.length}`).join(", ")}.${amt !== null ? ` Total ${amountCol!.name} on these records: ${fmt(amt)}.` : ""}${ageNote}`,
     });
@@ -160,7 +165,8 @@ export function scanTable(t: Table): ScanFinding[] {
       const near = common.find((cm) => cm !== x && cm.length >= 4 && (lev(x, cm) <= 2 || (x.startsWith(cm.slice(0, 4)) && x.includes("-"))));
       if (near && lev(x, near) <= 2) { pairs.push(`"${x}" looks like "${near}" (${k} records)`); affected += k; }
     }
-    if (pairs.length) out.push({ kind: "lookalike_names", column: c.name, keys: pairs.map((p) => p.split('"')[1]), title: `${pairs.length} look-alike name${pairs.length > 1 ? "s" : ""} in ${c.name} (${affected} records)`, detail: pairs.slice(0, 8).join("; ") + "." });
+    if (pairs.length) out.push({ kind: "lookalike_names", column: c.name, keys: pairs.map((p) => p.split('"')[1]),
+      card: { big: String(pairs.length), label: `look-alike names in ${human(c.name)} (${affected} records)`, facts: pairs.slice(0, 3).map((p) => p.replace(/ \(\d+ records\)/, "")) }, title: `${pairs.length} look-alike name${pairs.length > 1 ? "s" : ""} in ${c.name} (${affected} records)`, detail: pairs.slice(0, 8).join("; ") + "." });
   }
 
   // 5. A labelled subset (e.g. a hand audit): its class shares, with a 95% range, and the trend by year.
@@ -186,52 +192,178 @@ export function scanTable(t: Table): ScanFinding[] {
       t.rows.forEach((r) => { const v = r[c.i]; const sc = num(r[score.i]); if (v === null || v === "" || sc === null) return; const pos = String(v) === minor, flag = sc >= 0.5; if (pos && flag) tp++; else if (pos) fn++; else if (flag) fp++; else tn++; });
       if (tp + fn > 0 && fp + tn > 0) agree = ` ${score.name} at 0.5 catches ${tp} of ${tp + fn} "${minor}" (${fmt((100 * tp) / (tp + fn))}%) and wrongly flags ${fp} of ${fp + tn} others (${fmt((100 * fp) / (fp + tn))}%).`;
     }
-    out.push({ kind: "labelled_subset", column: c.name, title: `${c.filled} records are labelled in ${c.name}: ${fmt((100 * k) / c.filled)}% are "${minor}"`,
+    out.push({ kind: "labelled_subset", column: c.name,
+      card: { big: `${fmt((100 * k) / c.filled)}%`, label: `of ${c.filled} labelled records are "${minor}"`, facts: [`95% range ${fmt(100 * lo)}–${fmt(100 * hiP)}%`, ...(trend ? [trend.trim().split(", ").slice(-1)[0].replace(/\.$/, "")] : []), ...(agree ? [agree.trim().split(" and ")[0]] : [])] },
+      title: `${c.filled} records are labelled in ${c.name}: ${fmt((100 * k) / c.filled)}% are "${minor}"`,
       detail: `${k} of ${c.filled}; 95% range ${fmt(100 * lo)}%–${fmt(100 * hiP)}% if the labelled records are a random sample.${trend}${agree}` });
   }
-  out.push(...linkedGroups(t, cols, amountCol), ...outcomeDrivers(t, cols));
+  out.push(...linkedGroups(t, cols, amountCol), ...hotSpots(t, cols, amountCol), ...outcomeDrivers(t, cols));
   return out;
 }
 
+const OUTCOME = /churn|cancel|default|fraud|converted|left|attrit|outcome|refund|return|dispute|chargeback|reject|انسحب|ألغى|استرداد/i;
 type Col = { name: string; i: number; vals: Cell[]; filled: number; isNum: boolean; isDate: boolean; distinct: number };
 
 /**
  * Records connected through shared identifiers, even indirectly (A shares a phone with B, B a bank account with C).
  * Single-column counts miss these chains because each value is shared by only two records.
  */
+const ENTITY = /^(customer|user|account|client|member|subscriber|buyer|patient|applicant|merchant|vendor|driver|rider)[\s_-]?(id|no|number|ref|code)?$/i;
+/** The column naming who each row belongs to (customer_id…), when rows are events (orders, claims) rather than one row per person. */
+function entityCol(t: Table, cols: Col[]): Col | undefined {
+  return cols.find((c) => ENTITY.test(c.name.trim()) && c.distinct >= 20 && c.distinct <= t.rows.length * 0.95);
+}
+
+/** Every money column summed over a set of rows, with its share of the table's total (e.g. "discount_aed 22,800 (27.4% of all)"). */
+function moneyList(t: Table, cols: Col[], rows: number[], skip: Col[] = []) {
+  const money = cols.filter((c) => c.isNum && !skip.includes(c) && /aed|usd|amount|value|discount|refund|price|fee|cost|revenue|sales|loan|مبلغ|درهم|المبلغ/i.test(c.name)).slice(0, 4);
+  return money.map((c) => {
+    const sub = rows.reduce((s, ri) => s + (num(t.rows[ri][c.i]) ?? 0), 0);
+    const all = t.rows.reduce((s, r) => s + (num(r[c.i]) ?? 0), 0);
+    return { name: c.name, sub, share: (100 * sub) / (all || 1) };
+  }).filter((m) => m.sub > 0);
+}
+function moneyOf(t: Table, cols: Col[], rows: number[], skip: Col[] = []): string {
+  const parts = moneyList(t, cols, rows, skip).map((m) => `${m.name} ${fmt(m.sub)} (${fmt(m.share)}% of all)`);
+  return parts.length ? ` Money: ${parts.join("; ")}.` : "";
+}
+
+/** What is unusual about a set of rows compared with the whole table: over-represented categories (e.g. promo_code = WELCOME40). */
+function diffList(t: Table, cols: Col[], rows: number[], skip: Col[] = []) {
+  const out: { col: string; val: string; p: number; base: number }[] = [];
+  for (const c of cols.filter((x) => !x.isNum && !x.isDate && x.distinct <= 30 && !skip.includes(x))) {
+    const share = (rs: Cell[][], v: string) => rs.filter((r) => String(r[c.i] ?? "") === v).length / (rs.length || 1);
+    const sub = rows.map((ri) => t.rows[ri]);
+    const top = [...new Set(sub.map((r) => String(r[c.i] ?? "")))].map((v) => [v, share(sub, v), share(t.rows, v)] as const).sort((a, b) => b[1] - b[2] - (a[1] - a[2]))[0];
+    if (top && top[0] && top[0] !== "null" && top[1] - top[2] > 0.25) out.push({ col: c.name, val: top[0], p: top[1], base: top[2] });
+    if (out.length >= 3) break;
+  }
+  return out;
+}
+function whatsDifferent(t: Table, cols: Col[], rows: number[], skip: Col[] = []): string {
+  const out = diffList(t, cols, rows, skip).map((d) => `${fmt(100 * d.p)}% have ${d.col} = ${d.val} (vs ${fmt(100 * d.base)}% overall)`);
+  return out.length ? ` ${out.join("; ")}.` : "";
+}
+/** Headline facts for a group: what is unusual about it, then its money. */
+function cardFacts(t: Table, cols: Col[], rows: number[], skip: Col[] = []): string[] {
+  const d = diffList(t, cols, rows, skip).map((x) => x.p >= 0.995 ? `all ${human(x.col)} = ${x.val}` : `${fmt(100 * x.p)}% ${human(x.col)} = ${x.val} (vs ${fmt(100 * x.base)}%)`);
+  const m = moneyList(t, cols, rows, skip).filter((x) => x.share >= 2).sort((a, b) => b.share - a.share).slice(0, 2).map((x) => `${human(x.name)} ${fmt(x.sub)} · ${fmt(x.share)}% of all`);
+  return [...m, ...d.slice(0, 2)];
+}
+
+/**
+ * Records connected through shared identifiers, even indirectly (A shares a phone with B, B a bank account with C).
+ * Single-column counts miss these chains because each value is shared by only two records.
+ * When rows are events of an entity (orders of a customer), the links are between ENTITIES: a customer reusing their own phone on
+ * every order is normal; two customer accounts sharing a device is not.
+ */
 function linkedGroups(t: Table, cols: Col[], amountCol?: Col): ScanFinding[] {
   const n = t.rows.length;
-  const idLike = /account|phone|mobile|iban|ssn|card|tax|licen|ip|email|device|address|hash|passport|emirates|هاتف|حساب|عنوان|بريد/i;
-  const ids = cols.filter((c) => !c.isDate && (!c.isNum || idLike.test(c.name)) && (c.isNum || idLike.test(c.name) || c.distinct >= n * 0.9) && c.filled >= n * 0.5 && c.distinct >= n * 0.5 && c.distinct < n * 0.999
-    && !/(^id$|_id$|^id_|name$|اسم|date|تاريخ)/i.test(c.name));
+  const idLike = /account|phone|mobile|iban|ssn|card|tax|licen|\bip\b|ip_|email|device|imei|address|hash|passport|emirates|هاتف|حساب|عنوان|بريد|جهاز/i;
+  const ent = entityCol(t, cols);
   const keyCol = cols.find((c) => c.distinct === n && !c.isNum) ?? cols.find((c) => c.distinct === n);
-  if (ids.length < 2) return [];
-  const parent = t.rows.map((_, i) => i);
+  // Nodes: entities when there is an entity column, otherwise rows.
+  const nodeOf: number[] = [];
+  const nodeRows: number[][] = [];
+  if (ent) {
+    const idx = new Map<string, number>();
+    t.rows.forEach((r, ri) => { const k = String(r[ent.i] ?? "").trim(); if (!k) { nodeOf.push(-1); return; } let x = idx.get(k); if (x === undefined) { x = nodeRows.length; idx.set(k, x); nodeRows.push([]); } nodeOf.push(x); nodeRows[x].push(ri); });
+  } else t.rows.forEach((_, ri) => { nodeOf.push(ri); nodeRows.push([ri]); });
+  const N = nodeRows.length;
+  const ids = cols.filter((c) => c !== ent && !c.isDate && (!c.isNum || idLike.test(c.name)) && (c.isNum || idLike.test(c.name) || c.distinct >= n * 0.9) && c.filled >= n * 0.5
+    && c.distinct >= N * (ent ? 0.3 : 0.5) && c.distinct < n * 0.999 && !/(^id$|_id$|^id_|name$|اسم|date|تاريخ)/i.test(c.name) || (ent && c !== ent && idLike.test(c.name) && /_id$|^id_/i.test(c.name) && c.distinct >= N * 0.3 && c.distinct < n * 0.999));
+  if (ids.length < (ent ? 1 : 2)) return [];
+  const parent = Array.from({ length: N }, (_, i) => i);
   const find = (x: number): number => (parent[x] === x ? x : (parent[x] = find(parent[x])));
   const via = new Map<number, Set<string>>();
   for (const c of ids) {
     const first = new Map<string, number>();
     t.rows.forEach((r, ri) => {
+      const node = nodeOf[ri]; if (node < 0) return;
       const v = r[c.i]; if (v === null || v === "") return; const k = String(v).trim().toLowerCase();
       const f = first.get(k);
-      if (f === undefined) first.set(k, ri); else { const a = find(f), b = find(ri); if (a !== b) parent[a] = b; (via.get(ri) ?? via.set(ri, new Set()).get(ri)!).add(c.name); }
+      if (f === undefined) first.set(k, node); else if (f !== node) { const a = find(f), b = find(node); if (a !== b) parent[a] = b; (via.get(node) ?? via.set(node, new Set()).get(node)!).add(c.name); }
     });
   }
   const groups = new Map<number, number[]>();
-  t.rows.forEach((_, ri) => { const g = find(ri); (groups.get(g) ?? groups.set(g, []).get(g)!).push(ri); });
+  for (let x = 0; x < N; x++) { const g = find(x); (groups.get(g) ?? groups.set(g, []).get(g)!).push(x); }
   // Only groups that need the chain to be seen: if one shared value already covers the whole group, the repeated-identifier check reports it.
-  const coveredByOne = (g: number[]) => ids.some((c) => { const m = new Map<string, number>(); for (const ri of g) { const k = String(t.rows[ri][c.i] ?? "").trim().toLowerCase(); if (k) m.set(k, (m.get(k) ?? 0) + 1); } return Math.max(0, ...m.values()) >= g.length * 0.8; });
+  const coveredByOne = (g: number[]) => ids.some((c) => { const m = new Map<string, number>(); for (const x of g) { const k = String(t.rows[nodeRows[x][0]][c.i] ?? "").trim().toLowerCase(); if (k) m.set(k, (m.get(k) ?? 0) + 1); } return Math.max(0, ...m.values()) >= g.length * 0.8; });
   const big = [...groups.values()].filter((g) => g.length >= 5 && !coveredByOne(g)).sort((a, b) => b.length - a.length);
   if (!big.length) return [];
-  return big.slice(0, 5).map((g, k) => {
-    const kinds = new Set(g.flatMap((ri) => [...(via.get(ri) ?? [])]));
-    const amt = amountCol ? g.reduce((s, ri) => s + (num(t.rows[ri][amountCol.i]) ?? 0), 0) : null;
+  const perEntity = ent ? n / N : 1;
+  const out: ScanFinding[] = [];
+  // One total across clusters, for the headline: how many accounts, and how much money they took.
+  if (ent && big.length >= 2) {
+    const allRows = big.slice(0, 5).flatMap((g) => g.flatMap((x) => nodeRows[x]));
+    const accts = big.slice(0, 5).reduce((a, g) => a + g.length, 0);
+    const m = moneyList(t, cols, allRows).filter((x) => x.share >= 2).sort((a, b) => b.share - a.share).slice(0, 2);
+    out.push({ kind: "linked_summary", rows: allRows,
+      title: `${accts} ${ent.name} accounts in ${Math.min(5, big.length)} linked clusters`,
+      detail: `${m.map((x) => `${x.name} ${fmt(x.sub)} (${fmt(x.share)}% of all)`).join("; ")}.`,
+      card: { big: String(accts), label: `linked accounts in ${Math.min(5, big.length)} clusters`, facts: m.map((x) => `${human(x.name)} ${fmt(x.sub)} · ${fmt(x.share)}% of all`) } });
+  }
+  return [...out, ...big.slice(0, 5).map((g, k) => {
+    const rows = g.flatMap((x) => nodeRows[x]);
+    const kinds = new Set(g.flatMap((x) => [...(via.get(x) ?? [])]));
+    const amt = amountCol ? rows.reduce((s, ri) => s + (num(t.rows[ri][amountCol.i]) ?? 0), 0) : null;
+    const diff = whatsDifferent(t, cols, rows);
+    const label = `linked_group G${k + 1}`;
+    if (ent) {
+      const ex = g.slice(0, 6).map((x) => t.rows[nodeRows[x][0]][ent.i]).join(", ");
+      return {
+        kind: "linked_group", rows, keys: g.slice(0, 60).map((x) => String(t.rows[nodeRows[x][0]][ent.i])),
+        card: { big: String(g.length), label: `linked accounts, chained by shared ${[...kinds].map(human).join(", ")}`, facts: [...cardFacts(t, cols, rows), `${fmt(rows.length / g.length)} order${rows.length / g.length < 1.5 ? "" : "s"} per account vs ${fmt(perEntity)} normally`].slice(0, 4) },
+        title: `${g.length} ${ent.name} accounts are linked to each other through shared ${[...kinds].join(", ")} (${label})`,
+        detail: `Different accounts chained together by shared values (A shares with B, B with C); each shared value alone looks harmless. They have ${rows.length} rows, ${fmt(rows.length / g.length)} per account vs ${fmt(perEntity)} overall.${moneyOf(t, cols, rows)}${diff} Examples: ${ex}.`,
+      };
+    }
     return {
-      kind: "linked_group", rows: g, keys: keyCol ? g.slice(0, 60).map((ri) => String(t.rows[ri][keyCol.i])) : undefined,
-      title: `${g.length} records are linked to each other through shared ${[...kinds].join(", ")} (linked_group G${k + 1})`,
-      detail: `They form one connected group through chains of shared values (A shares with B, B with C), which a single-column count does not show.${amt !== null ? ` Total ${amountCol!.name}: ${fmt(amt)}.` : ""}${keyCol ? ` Examples: ${g.slice(0, 6).map((ri) => t.rows[ri][keyCol.i]).join(", ")}.` : ""}`,
+      kind: "linked_group", rows, keys: keyCol ? rows.slice(0, 60).map((ri) => String(t.rows[ri][keyCol.i])) : undefined,
+      card: { big: String(g.length), label: `records linked through chains of shared ${[...kinds].map(human).join(", ")}`, facts: [...(amt !== null ? [`${human(amountCol!.name)} ${fmt(amt)}`] : []), ...cardFacts(t, cols, rows)] },
+      title: `${g.length} records are linked to each other through shared ${[...kinds].join(", ")} (${label})`,
+      detail: `They form one connected group through chains of shared values (A shares with B, B with C), which a single-column count does not show.${amt !== null ? ` Total ${amountCol!.name}: ${fmt(amt)}.` : ""}${diff}${keyCol ? ` Examples: ${rows.slice(0, 6).map((ri) => t.rows[ri][keyCol.i]).join(", ")}.` : ""}`,
     };
-  });
+  })];
+}
+
+/**
+ * Hot spots: one value of a many-valued column (a rider, a branch, an agent, a merchant) where a bad outcome (refunds, fraud, churn…)
+ * is far above normal. Too many values for a chart, so code checks every one.
+ */
+function hotSpots(t: Table, cols: Col[], amountCol?: Col): ScanFinding[] {
+  const n = t.rows.length;
+  const yes = /^(yes|y|true|1|refunded|returned|rejected|churned|cancelled|canceled|default(ed)?|fraud|disputed|نعم)$/i;
+  const outs = cols.filter((c) => OUTCOME.test(c.name) && c.distinct === 2 && c.filled >= n * 0.8);
+  const ent = entityCol(t, cols);
+  const res: ScanFinding[] = [];
+  for (const oc of outs) {
+    const isYes = (r: Cell[]) => yes.test(String(r[oc.i]).trim());
+    const base = t.rows.filter(isYes).length / n;
+    if (base <= 0 || base >= 0.5) continue;
+    const money = cols.find((c) => c.isNum && new RegExp(oc.name.replace(/(ed|s)$/i, ""), "i").test(c.name) && /aed|amount|value|usd|sum/i.test(c.name)) ?? amountCol;
+    // People's names are not a grouping (different people share names); identifiers are handled by the linking checks.
+    for (const c of cols.filter((x) => !x.isNum && !x.isDate && x !== oc && x !== ent && x.distinct > 12 && x.distinct <= Math.max(60, n / 20)
+      && !/name|اسم|phone|email|address|device|card|account|هاتف|بريد|عنوان/i.test(x.name))) {
+      const m = new Map<string, number[]>();
+      t.rows.forEach((r, ri) => { const k = String(r[c.i] ?? ""); if (k) (m.get(k) ?? m.set(k, []).get(k)!).push(ri); });
+      const hot = [...m.entries()].map(([k, rs]) => { const y = rs.filter((ri) => isYes(t.rows[ri])); const p = y.length / rs.length; const z = (p - base) / Math.sqrt((base * (1 - base)) / rs.length); return { k, rs, y, p, z }; })
+        .filter((h) => h.rs.length >= 20 && h.p >= base * 3 && h.z >= 5).sort((a, b) => b.z - a.z).slice(0, 3);
+      for (const h of hot) {
+        const amt = money ? h.y.reduce((s, ri) => s + (num(t.rows[ri][money.i]) ?? 0), 0) : null;
+        const totalAmt = money ? t.rows.filter(isYes).reduce((s, r) => s + (num(r[money.i]) ?? 0), 0) : null;
+        const who = ent ? ` They involve ${new Set(h.y.map((ri) => String(t.rows[ri][ent.i]))).size} different ${ent.name} values.` : "";
+        res.push({ kind: "hot_spot", column: c.name, rows: h.y,
+          card: { big: h.k, label: `${human(c.name)}: ${human(oc.name)} on ${fmt(100 * h.p)}% of orders vs ${fmt(100 * base)}% normally`, facts: [
+            ...(amt !== null ? [`${human(money!.name)} ${fmt(amt)}${totalAmt ? ` · ${fmt((100 * amt) / totalAmt)}% of all` : ""}`] : []),
+            ...(ent ? [`${new Set(h.y.map((ri) => String(t.rows[ri][ent.i]))).size} different ${human(ent.name)}s`] : []),
+            ...diffList(t, cols, h.y, [c, oc]).slice(0, 1).map((d) => `${fmt(100 * d.p)}% ${human(d.col)} = ${d.val}`)] },
+          title: `${c.name} ${h.k}: ${oc.name} = yes on ${fmt(100 * h.p)}% of rows (${h.y.length} of ${h.rs.length}), vs ${fmt(100 * base)}% overall`,
+          detail: `${amt !== null ? `${money!.name} on these: ${fmt(amt)}${totalAmt ? ` (${fmt((100 * amt) / totalAmt)}% of all ${money!.name})` : ""}.` : ""}${who}${whatsDifferent(t, cols, h.y, [c, oc])}` });
+      }
+    }
+  }
+  return res;
 }
 
 /**
@@ -240,7 +372,7 @@ function linkedGroups(t: Table, cols: Col[], amountCol?: Col): ScanFinding[] {
  */
 function outcomeDrivers(t: Table, cols: Col[]): ScanFinding[] {
   const yes = /^(yes|y|true|1|churned|cancelled|canceled|default(ed)?|fraud|نعم)$/i;
-  const oc = cols.find((c) => /churn|cancel|default|fraud|converted|left|attrit|outcome|انسحب|ألغى/i.test(c.name) && c.distinct === 2 && c.filled >= t.rows.length * 0.8);
+  const oc = cols.find((c) => OUTCOME.test(c.name) && !/refund|return|dispute|chargeback/i.test(c.name) && c.distinct === 2 && c.filled >= t.rows.length * 0.8);
   if (!oc) return [];
   const isYes = (r: Cell[]) => yes.test(String(r[oc.i]).trim());
   const base = t.rows.filter(isYes).length / t.rows.length;
@@ -268,6 +400,7 @@ function outcomeDrivers(t: Table, cols: Col[]): ScanFinding[] {
   const pct = (x: number) => `${fmt(100 * x)}%`;
   const out: ScanFinding[] = [{
     kind: "outcome_drivers", column: oc.name,
+    card: { big: pct(factors[0].hi.rate), label: `${human(oc.name)} when ${human(factors[0].c.name)} = ${factors[0].hi.k}, vs ${pct(factors[0].lo.rate)} when ${factors[0].lo.k}`, facts: factors.slice(1, 3).map((f) => `${human(f.c.name)}: ${pct(f.hi.rate)} vs ${pct(f.lo.rate)}`) },
     title: `${oc.name}: ${pct(base)} overall; it differs most by ${factors.slice(0, 3).map((f) => f.c.name).join(", ")}`,
     detail: factors.slice(0, 5).map((f) => `${f.c.name}: ${pct(f.hi.rate)} when ${f.hi.k} vs ${pct(f.lo.rate)} when ${f.lo.k}`).join("; ") + ".",
   }];

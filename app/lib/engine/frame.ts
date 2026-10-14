@@ -49,7 +49,8 @@ const SCHEMA = S.obj({
 export async function runFrame(engagementId: string, jobId: number) {
   setStep(jobId, "reading");
   const { c, text, evidence } = caseContext(engagementId);
-  const reframe = c.e.question_version > 1 || evidence.length > 0;
+  // Re-framing only when the question changed or the consultant already asked for evidence; briefing files given at the start do not count.
+  const reframe = c.e.question_version > 1 || (evidence.length > 0 && c.items.some((i) => i.origin === "requested"));
 
   setStep(jobId, reframe ? "reframing" : "framing");
   const out = await generateJson<FrameOut>({

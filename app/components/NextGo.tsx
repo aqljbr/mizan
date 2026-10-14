@@ -1,7 +1,7 @@
 "use client";
 
 // Moves the reader to what the next step is about: switches to the right tab, then scrolls and focuses.
-const TAB_OF: Record<string, string> = { und: "overview", progress: "overview", data: "data", report: "answer" };
+const TAB_OF: Record<string, string> = { und: "overview", progress: "overview", data: "data", report: "answer", scanH: "analysis" };
 
 export function NextGo({ target, label }: { target: string; label: string }) {
   return (

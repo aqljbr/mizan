@@ -382,3 +382,13 @@ pre.ai-saw { white-space: pre-wrap; word-break: break-word; font-size: 12.5px; l
 .tr-row p { margin: 4px 0 0; }
 @media (max-width: 600px) { .tr-row { grid-template-columns: 1fr; } }
 pre.ai-saw mark, .data-t mark { background: #F3E7C9; color: #6B4E12; padding: 0 2px; border-radius: 2px; }
+
+.first-look { border-inline-start: 3px solid var(--gold, #A9822F); }
+.fl-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-block-start: 8px; }
+.fl-card { display: grid; gap: 4px; padding: 12px 14px; border: 1px solid var(--line, #E3DFD6); border-radius: 4px; background: var(--paper, #fff); }
+.fl-n { font-family: var(--serif, Georgia, serif); font-size: 34px; font-weight: 700; color: var(--navy, #0B1F33); line-height: 1.1; }
+.fl-t { font-size: 14px; line-height: 1.4; }
+.fl-m { color: var(--gold, #A9822F); font-weight: 600; }
+.fl-f { margin: 2px 0 0; padding-inline-start: 16px; color: var(--ink2, #3A4654); display: grid; gap: 2px; }
+.fl-f li:last-child { color: var(--gold, #A9822F); font-weight: 600; }
+.fl-sum { font-size: 17px; margin: 4px 0 10px; } .fl-sum b { font-family: var(--serif, Georgia, serif); font-size: 26px; color: var(--navy, #0B1F33); margin-inline-end: 4px; }

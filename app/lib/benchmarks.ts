@@ -19,6 +19,10 @@ const has = (f: ScanFinding[], kind: string, ...needles: string[]) =>
   f.find((x) => x.kind === kind && needles.every((n) => `${x.title} ${x.detail}`.includes(n)));
 
 export const CODE_CHECKS: CodeCheck[] = [
+  { id: "farm-links", kinds: ["linked_group"], problem: "Voucher farms at a Dubai delivery app", file: "lazeez_orders.csv", planted: "570 fake accounts in 3 farms (260, 190, 120) farming the AED 40 welcome voucher, chained by shared devices, phones, cards and addresses", expect: "all 3 farms, with their exact sizes",
+    test: (f) => !!has(f, "linked_group", "260 customer_id accounts") && !!has(f, "linked_group", "190 customer_id accounts") && !!has(f, "linked_group", "120 customer_id accounts") },
+  { id: "rider-refunds", kinds: ["hot_spot"], problem: "Voucher farms at a Dubai delivery app", file: "lazeez_orders.csv", planted: "rider R-217 colluding on 153 'missing item' refunds, AED 13,993 (18.5% of all refunds)", expect: "R-217 with the exact count and amount",
+    test: (f) => !!has(f, "hot_spot", "R-217", "153 of", "13,993") },
   { id: "ring-bank", kinds: ["repeated_identifier"], problem: "Relief-loan fraud rings", file: "relief_loans_sample.csv", planted: "60 applications paid into 4 shared bank accounts, $8,134,797", expect: "repeated bank accounts with the exact total",
     test: (f) => !!has(f, "repeated_identifier", "bank_account", "60 records", "8,134,797") },
   { id: "ring-owner", kinds: ["repeated_identifier"], problem: "Relief-loan fraud rings", file: "relief_loans_sample.csv", planted: "45 applications reusing 9 owner IDs, $4,683,669", expect: "all 9 reused owner IDs with the exact total",
@@ -95,5 +99,7 @@ export const FULL_RUNS: { date: string; problem: string; kind: "real outcome" | 
   { date: "2026-10-14", problem: "Fraud split across two systems", kind: "planted truth", truth: "48-app chain ring $1,796,000; 70 dead/never-issued SSNs $2,301,800; April burst", mizan: "All three, exact, in the answer", result: "match" },
   { date: "2026-10-14", problem: "Cut prices 15% to stop churn?", kind: "planted truth", truth: "No: support tickets and cash payment drive churn, not price", mizan: "Not a blanket cut; with zero tickets every plan churns alike (8.5/8.8/8.9%)", result: "match" },
   { date: "2026-10-14", problem: "Open 3 cloud kitchens; 3-year payback?", kind: "planted truth", truth: "NPV AED 925,890; payback 3.39 years, so no", mizan: "\"Don't, as proposed\": NPV 925,890, payback 3.4 years", result: "match" },
+  { date: "2026-10-14", problem: "Lazeez (Dubai delivery app): cut the welcome-voucher budget 30%?", kind: "planted truth", truth: "No: 570 linked farm accounts took AED 22,800 (27% of welcome spend); rider R-217 refund ring AED 13,993",
+    mizan: "\"Don't, as proposed\": all 3 farms (AED 22,800 exact) and R-217 (43.7% refund rate, 18.5% of refunds); target the leaks, keep the offer", result: "match" },
   { date: "2026-10-14", problem: "Which branch is underperforming? (messy Arabic Excel)", kind: "planted truth", truth: "Deira: AED 893,502 → 535,909 (−40%)", mizan: "Deira, with Q2 AED 535,909 exact; did not state the −40% in the answer", result: "partial" },
 ];
